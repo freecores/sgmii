@@ -1,5 +1,5 @@
 /*
-Developed By Subtleware Corporation Pte Ltd 2011
+Developed By Jeff Lieu (lieumychuong@gmail.com)
 File		:
 Description	:
 	This core implements:
@@ -335,6 +335,7 @@ module mSGMII
 	.i_Clk				(w_ClkSys			),
 	.i_ARst_L			(w_ARstLogic_L		));
 	
+	assign w_SignalDetect=~w_RxCodeInvalid;
 	
 	mXcver u0Xcver(
 
@@ -348,7 +349,7 @@ module mSGMII
 	.i_XcverDigitalRst	(~w_ARstLogic_L		),	
 	.o_PllLocked		(w_PllLocked		),
 	
-	.o_SignalDetect		(w_SignalDetect		),
+	.o_SignalDetect		(),
 	.o8_RxCodeGroup		(w8_RxCode			),
 	.o_RxCodeInvalid	(w_RxCodeInvalid	),
 	.o_RxCodeCtrl		(w_RxCodeCtrl		),

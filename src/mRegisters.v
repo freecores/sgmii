@@ -134,7 +134,7 @@ module mRegisters(
 	assign o16_LcAdvAbility = w16_LcAdvAbility;
 	
 	assign w16_LcAdvAbility = (w_UseAsSGMII==1'b0)?({1'b0,i16_TxConfigReg[15],r16_CtrlReg4[13:12],3'b000,r16_CtrlReg4[8:7],2'b01,5'b00000})://1000-X mode
-							((w_SGMII_PHY==1'b1)?({i_PhyLink,i16_TxConfigReg[15],1'b0,i_PhyDuplex,i2_PhySpeed,10'h1}):
+								((w_SGMII_PHY==1'b1)?({i_PhyLink,i16_TxConfigReg[15],1'b0,(i_PhyDuplex|r16_CtrlReg4[12]),(i2_PhySpeed|r16_CtrlReg4[11:10]),10'h1})://SGMII mode - PHY Side
 								({1'b0,i16_TxConfigReg[15],1'b0,3'b000,10'h1}));//SGMII mode - MAC Side
 	
 	assign w16_StatusReg1 = {9'h0,i_ANComplete,2'b01,i_SyncStatus,2'b0};

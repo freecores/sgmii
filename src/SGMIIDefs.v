@@ -19,3 +19,13 @@
 `define cReg0Default	16'h0000
 `define cRegXDefault	16'h0000
 `define cRegLinkTimerDefault	(10_000_000/8)
+
+`define cLcAbility_FD	16'h0020	
+`define cLcAbility_HD	16'h0040	
+`define cLcAbility_PS1	16'h0080
+`define cLcAbility_PS2	16'h0100
+`define cLcAbility_RF1	16'h1000
+`define cLcAbility_RF2	16'h2000
+
+
+	
