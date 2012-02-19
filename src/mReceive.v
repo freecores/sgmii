@@ -146,7 +146,7 @@ wire	w_IsVSet;
 		stWAIT_FOR_K: if(i_IsComma && i_RxEven) r21_NxtState <= stRX_K; else r21_NxtState<=stWAIT_FOR_K;
 		stRX_K		: if(wSUDID21_5||wSUDID2_2)
 						r21_NxtState <= stRX_CB; else
-						if((!i_RxCodeInvalid) && (!i_RxCodeCtrl) && i3_Xmit!=`cXmitDATA)
+						if((!i_RxCodeInvalid) && (i_RxCodeCtrl) && i3_Xmit!=`cXmitDATA)
 						r21_NxtState <= stRX_INVALID; else
 							if(((!i_RxCodeInvalid) && (!i_RxCodeCtrl) && i3_Xmit!=`cXmitDATA && i8_RxCodeGroupIn!=`D21_5 && i8_RxCodeGroupIn!=`D2_2)||
 								((!i_RxCodeInvalid) && i3_Xmit==`cXmitDATA && ((i8_RxCodeGroupIn!=`D21_5 && i8_RxCodeGroupIn!=`D2_2 && (!i_RxCodeCtrl))||i_RxCodeCtrl)))

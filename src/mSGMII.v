@@ -38,6 +38,11 @@ module mSGMII
 	
 	output	o_Linkup,
 	output	o_ANDone,
+	//This is used in Phy-Side SGMII 
+	input 	i_PhyLink,
+	input	i_PhyDuplex,
+	input 	[1:0] i2_PhySpeed,	
+	
 	
 	output	[1:0] o2_SGMIISpeed,
 	output	o_SGMIIDuplex,
