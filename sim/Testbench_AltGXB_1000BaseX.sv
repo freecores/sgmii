@@ -429,11 +429,6 @@ integer tstcfg_RxPktCnt;
 			s32_TxCarrierErrCycles[tstcfg_TxPktCnt+Idx]=0;
 			for(Octet=0;Octet<PktSize;Octet=Octet+1)
 				begin
-				if(Octet<7)
-					r8_TxBuffer[tstcfg_TxPktCnt+Idx][Octet]=8'h55;					
-				else if(Octet==7)
-					r8_TxBuffer[tstcfg_TxPktCnt+Idx][Octet]=8'hD5;
-				else
 					r8_TxBuffer[tstcfg_TxPktCnt+Idx][Octet]=$random;
 				end
 			r8_TxBuffer[tstcfg_TxPktCnt+Idx][8]=PktSize & 32'h00FF;					
@@ -446,9 +441,9 @@ integer tstcfg_RxPktCnt;
 				u0MacEmulator.tsk_TransmitPkt(r8_TxBuffer[tstcfg_TxPktCnt+Idx],PktSize,PktIFG);							
 				end
 				begin 
-				//$display("u1: Sending Packet %d Size %d",tstcfg_TxPktCnt+Idx,PktSize);
-				#8;		//If You Remove This Delay, you will have error in first packet.
-				//u1MacEmulator.tsk_TransmitPkt(r8_TxBuffer[tstcfg_TxPktCnt+Idx],PktSize,PktIFG);
+				$display("u1: Sending Packet %d Size %d",tstcfg_TxPktCnt+Idx,PktSize);
+				//#8;		//If You Remove This Delay, you will have error in first packet.
+				u1MacEmulator.tsk_TransmitPkt(r8_TxBuffer[tstcfg_TxPktCnt+Idx],PktSize,PktIFG);
 				end
 			join
 			
