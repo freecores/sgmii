@@ -19,6 +19,8 @@ Remarks		:
 	
 	- The Path of U0 --> U1 is ok.
 	
+	- Testing with Version 11.1sp2 core seems to be ok, this problem is not found
+	
 Revision	:
 	Date	Author	Description
 
