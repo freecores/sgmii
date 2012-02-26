@@ -141,7 +141,7 @@ module mRegisters(
 	assign w_UseAsSGMII 	= r16_ModeReg[0];
 	assign w_SGMII_PHY		= r16_ModeReg[1];
 	assign w_UseLcConfig	= r16_ModeReg[2];
-	assign o2_SGMIISpeed	= (w_UseAsSGMII==1'b0)?2'b10:((w_UseLcConfig==1'b0)?i16_LpAdvAbility[11:10]:{r16_CtrlReg0[6],r16_CtrlReg0[13]});
-	assign o_SGMIIDuplex 	= (w_UseAsSGMII==1'b0)?1'b1:((w_UseLcConfig==1'b0)?i16_LpAdvAbility[12]:{r16_CtrlReg0[8]});
+	assign o2_SGMIISpeed	= (w_UseAsSGMII==1'b0)?2'b10:((w_UseLcConfig==1'b0)?i16_LpAdvAbility[11:10]:{r16_CtrlReg0[6]|i2_PhySpeed[1],r16_CtrlReg0[13]|i2_PhySpeed[0]});
+	assign o_SGMIIDuplex 	= (w_UseAsSGMII==1'b0)?1'b1:((w_UseLcConfig==1'b0)?i16_LpAdvAbility[12]:{r16_CtrlReg0[8]|i_PhyDuplex});
 
 endmodule
