@@ -47,9 +47,9 @@ module mRateAdapter(
 	wire w_TxSop;
 	wire w_TxEop;
 	
-	assign w_TxActive = i_TxEN & i_TxER;
-	assign w_TxSop = (~r_TxActive && w_TxActive);
-	assign w_TxEop = (r_TxActive && ~w_TxActive);
+	assign w_TxActive = i_TxEN | i_TxER;
+	assign w_TxSop = (~r_TxActive & w_TxActive);
+	assign w_TxEop = (r_TxActive & ~w_TxActive);
 	
 	always@(posedge i_TxClk)
 	begin
@@ -61,7 +61,7 @@ module mRateAdapter(
 			if(r_HighNib) r8_Byte <= {i8_TxD[3:0],r4_LowNib};
 			if(r_HighNib && (~w_TxSop)) r_TxEN_D <= i_TxEN;
 			if(r_HighNib && (~w_TxSop)) r_TxER_D <= i_TxER;
-			end else
+		end else if(r_HighNib)
 			 begin
 			 r_TxEN_D <= 1'b0;
 			 r_TxER_D <= 1'b0; 
@@ -104,6 +104,8 @@ module mRateAdapter(
 		r_RxActive <= w_RxActive;		
 		if(w_RxSop) r4_Cntr<=4'h0; 
 		else if(w_RxActive) r4_Cntr <= ((r4_Cntr==4'h9)?4'h0:(r4_Cntr+4'h1));		
+		else r4_Cntr <= 4'h0;
+		
 		if(r4_Cntr==4'h0) r6_GByte <= {i_RxEN,i_RxER,i8_RxD[3:0]};		
 		else if(r4_Cntr==4'h5) r6_GByte <= {i_RxEN,i_RxER,i8_RxD[7:4]};		
 	end

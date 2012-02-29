@@ -367,7 +367,12 @@ module mSGMII
 	
 	assign o_GMIIClk = w_ClkSys;
 	
-	always@(posedge w_ClkSys)
+	always@(posedge w_ClkSys or negedge i_ARstHardware_L )
+	if(~i_ARstHardware_L)
+	begin
+		r7_Cntr 	<= 7'h0;
+		r_MIIClk 	<= 1'b0;	
+	end else		
 	begin
 		if(o2_SGMIISpeed==2'b01)
 			begin

@@ -8,6 +8,7 @@ integer ErrorCode=0;
 		ErrorCnt=0;
 		ErrorCode=0;
 	end
+`define Info(Message) $display("I@(%d):%s",$time,Message);
 `define CheckE(Signal,Value,SignalName) if(Signal!==Value) begin \
 				$display("E@(%d): expect %x, actual %x (%s,%s,%d)",$time,Value,Signal,SignalName,`__FILE__,`__LINE__); \
 				ErrorCnt=ErrorCnt+1;\
