@@ -187,5 +187,18 @@ reg	 [3:0] r4_ID2;
 	stSYNC_ACQUIRED_4A	: r240_SyncStateName<="stSYNC_ACQUIRED_4A	";
 	endcase	
 	//synthesis translate_on
-	
+	reg [3:0] r7_SlipTmr =0;		
+	always@(posedge i_Clk or negedge i_ARst_L)
+	if(~i_ARst_L)
+		r7_SlipTmr  <= 7'h0;
+	else begin 
+		
+		if(r13_State==stLOSS_OF_SYNC) begin 
+			if(w_IsComma) r7_SlipTmr <= 0;			
+			else r7_SlipTmr <= r7_SlipTmr+7'h1;							
+			end
+		else r7_SlipTmr <= 0;
+		end
+	assign o_BitSlip = &r7_SlipTmr[3:0]; 	
+		
 endmodule

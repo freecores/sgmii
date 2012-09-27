@@ -1,0 +1,166 @@
+# vsim +nowarnTSCALE +nowarnTFMPC +nowarnTOFD -L lpm_ver -L altera_mf_ver -L sgate_ver -L mAlt8b10bdec -do {run -all; quit} -l run_modelsim.log -c tb 
+# Loading work.tb
+# Loading mAlt8b10bdec.mAlt8b10bdec
+# Loading sgate_ver.oper_add
+# Loading lpm_ver.lpm_add_sub
+# Loading sgate_ver.oper_less_than
+# Loading sgate_ver.oper_mux
+# run -all 
+# ***********************************************************
+# title:  tb.demo_dec
+# desc:   demonstration testbench
+#         (c) Altera Inc. ALL RIGHTS RESERVED           
+#         www.altera.com                                     
+# ***********************************************************
+# PURPOSE: Demonstrate basic function and provide hookup example.
+# PURPOSE: Note: no error checking is performed.
+# METHOD:  A generator emits several random data and control values.
+# ***********************************************************
+# 10000 dec_enable = 1 dec_datain = xxx, dec_kout = 0, dec_dataout = 00
+# 30000 dec_enable = 1 dec_datain = 0b9, dec_kout = 0, dec_dataout = 00
+# 50000 dec_enable = 1 dec_datain = 0b9, dec_kout = 0, dec_dataout = 00
+# 70000 dec_enable = 1 dec_datain = 17c, dec_kout = 0, dec_dataout = 00
+# 90000 dec_enable = 1 dec_datain = 283, dec_kout = 0, dec_dataout = 00
+# 110000 dec_enable = 1 dec_datain = 17c, dec_kout = 0, dec_dataout = 00
+# 130000 dec_enable = 1 dec_datain = 283, dec_kout = 0, dec_dataout = 00
+# 150000 dec_enable = 1 dec_datain = 17c, dec_kout = 0, dec_dataout = 00
+# 170000 dec_enable = 1 dec_datain = 283, dec_kout = 0, dec_dataout = 00
+# 190000 dec_enable = 1 dec_datain = 17c, dec_kout = 0, dec_dataout = 00
+# 210000 dec_enable = 1 dec_datain = 283, dec_kout = 0, dec_dataout = 00
+# 230000 dec_enable = 1 dec_datain = 17c, dec_kout = 0, dec_dataout = 00
+# 250000 dec_enable = 1 dec_datain = 283, dec_kout = 1, dec_dataout = bc
+# 270000 dec_enable = 1 dec_datain = 17c, dec_kout = 1, dec_dataout = bc
+# 290000 dec_enable = 1 dec_datain = 283, dec_kout = 1, dec_dataout = bc
+# 310000 dec_enable = 1 dec_datain = 17c, dec_kout = 1, dec_dataout = bc
+# 330000 dec_enable = 1 dec_datain = 283, dec_kout = 1, dec_dataout = bc
+# 350000 dec_enable = 1 dec_datain = 17c, dec_kout = 1, dec_dataout = bc
+# 370000 dec_enable = 1 dec_datain = 283, dec_kout = 1, dec_dataout = bc
+# 390000 dec_enable = 1 dec_datain = 17c, dec_kout = 1, dec_dataout = bc
+# 410000 dec_enable = 1 dec_datain = 283, dec_kout = 1, dec_dataout = bc
+# 430000 dec_enable = 1 dec_datain = 17c, dec_kout = 1, dec_dataout = bc
+# 450000 dec_enable = 1 dec_datain = 283, dec_kout = 1, dec_dataout = bc
+# 470000 dec_enable = 1 dec_datain = 17c, dec_kout = 1, dec_dataout = bc
+# 490000 dec_enable = 1 dec_datain = 358, dec_kout = 1, dec_dataout = bc
+# 510000 dec_enable = 1 dec_datain = 2d2, dec_kout = 1, dec_dataout = bc
+# 530000 dec_enable = 1 dec_datain = 172, dec_kout = 0, dec_dataout = 08
+# 550000 dec_enable = 1 dec_datain = 171, dec_kout = 0, dec_dataout = 82
+# 570000 dec_enable = 1 dec_datain = 192, dec_kout = 0, dec_dataout = b2
+# 590000 dec_enable = 1 dec_datain = 0ea, dec_kout = 0, dec_dataout = b1
+# 610000 dec_enable = 1 dec_datain = 335, dec_kout = 0, dec_dataout = c2
+# 630000 dec_enable = 1 dec_datain = 113, dec_kout = 0, dec_dataout = 6a
+# 650000 dec_enable = 1 dec_datain = 36a, dec_kout = 0, dec_dataout = 7f
+# 670000 dec_enable = 1 dec_datain = 30e, dec_kout = 0, dec_dataout = 93
+# 690000 dec_enable = 1 dec_datain = 34c, dec_kout = 0, dec_dataout = 0a
+# 710000 dec_enable = 1 dec_datain = 2c3, dec_kout = 0, dec_dataout = 6e
+# 730000 dec_enable = 1 dec_datain = 21c, dec_kout = 0, dec_dataout = 18
+# 750000 dec_enable = 1 dec_datain = 365, dec_kout = 1, dec_dataout = 9c
+# 770000 dec_enable = 1 dec_datain = 26c, dec_kout = 0, dec_dataout = fc
+# 790000 dec_enable = 1 dec_datain = 2e4, dec_kout = 0, dec_dataout = 05
+# 810000 dec_enable = 1 dec_datain = 1d2, dec_kout = 0, dec_dataout = 2c
+# 830000 dec_enable = 1 dec_datain = 1e1, dec_kout = 0, dec_dataout = 9b
+# 850000 dec_enable = 1 dec_datain = 08b, dec_kout = 0, dec_dataout = e2
+# 870000 dec_enable = 1 dec_datain = 18d, dec_kout = 0, dec_dataout = fe
+# 890000 dec_enable = 1 dec_datain = 267, dec_kout = 0, dec_dataout = 0b
+# 910000 dec_enable = 1 dec_datain = 313, dec_kout = 0, dec_dataout = cd
+# 930000 dec_enable = 1 dec_datain = 0a9, dec_kout = 0, dec_dataout = 28
+# 950000 dec_enable = 1 dec_datain = 1b2, dec_kout = 0, dec_dataout = 73
+# 970000 dec_enable = 1 dec_datain = 2d3, dec_kout = 0, dec_dataout = 09
+# 990000 dec_enable = 1 dec_datain = 272, dec_kout = 0, dec_dataout = d2
+# 1010000 dec_enable = 1 dec_datain = 283, dec_kout = 0, dec_dataout = 93
+# 1030000 dec_enable = 1 dec_datain = 1e9, dec_kout = 0, dec_dataout = 32
+# 1050000 dec_enable = 1 dec_datain = 22a, dec_kout = 1, dec_dataout = bc
+# 1070000 dec_enable = 1 dec_datain = 295, dec_kout = 0, dec_dataout = e9
+# 1090000 dec_enable = 1 dec_datain = 19e, dec_kout = 0, dec_dataout = ea
+# 1110000 dec_enable = 1 dec_datain = 1a4, dec_kout = 0, dec_dataout = 55
+# 1130000 dec_enable = 1 dec_datain = 057, dec_kout = 0, dec_dataout = de
+# 1150000 dec_enable = 1 dec_datain = 26b, dec_kout = 0, dec_dataout = db
+# 1170000 dec_enable = 1 dec_datain = 0b1, dec_kout = 1, dec_dataout = f7
+# 1190000 dec_enable = 1 dec_datain = 0c7, dec_kout = 0, dec_dataout = 24
+# 1210000 dec_enable = 1 dec_datain = 2d6, dec_kout = 0, dec_dataout = 11
+# 1230000 dec_enable = 1 dec_datain = 2b2, dec_kout = 0, dec_dataout = 67
+# 1250000 dec_enable = 1 dec_datain = 2b8, dec_kout = 0, dec_dataout = 96
+# 1270000 dec_enable = 1 dec_datain = 292, dec_kout = 0, dec_dataout = 52
+# 1290000 dec_enable = 1 dec_datain = 1bc, dec_kout = 0, dec_dataout = 47
+# 1310000 dec_enable = 1 dec_datain = 21a, dec_kout = 0, dec_dataout = 42
+# 1330000 dec_enable = 1 dec_datain = 1dc, dec_kout = 1, dec_dataout = dc
+# 1350000 dec_enable = 1 dec_datain = 22c, dec_kout = 0, dec_dataout = fa
+# 1370000 dec_enable = 1 dec_datain = 097, dec_kout = 0, dec_dataout = fc
+# 1390000 dec_enable = 1 dec_datain = 1e3, dec_kout = 0, dec_dataout = ec
+# 1410000 dec_enable = 1 dec_datain = 3a1, dec_kout = 0, dec_dataout = 17
+# 1430000 dec_enable = 1 dec_datain = 3a2, dec_kout = 0, dec_dataout = e3
+# 1450000 dec_enable = 1 dec_datain = 2a2, dec_kout = 1, dec_dataout = fe
+# 1470000 dec_enable = 1 dec_datain = 1b2, dec_kout = 1, dec_dataout = fd
+# 1490000 dec_enable = 1 dec_datain = 0e6, dec_kout = 0, dec_dataout = 5d
+# 1510000 dec_enable = 1 dec_datain = 22e, dec_kout = 0, dec_dataout = d2
+# 1530000 dec_enable = 1 dec_datain = 296, dec_kout = 0, dec_dataout = 66
+# 1550000 dec_enable = 1 dec_datain = 296, dec_kout = 0, dec_dataout = e1
+# 1570000 dec_enable = 1 dec_datain = 07c, dec_kout = 0, dec_dataout = 56
+# 1590000 dec_enable = 1 dec_datain = 24b, dec_kout = 0, dec_dataout = 56
+# 1610000 dec_enable = 1 dec_datain = 139, dec_kout = 1, dec_dataout = fc
+# 1630000 dec_enable = 1 dec_datain = 33c, dec_kout = 0, dec_dataout = 2b
+# 1650000 dec_enable = 1 dec_datain = 31c, dec_kout = 0, dec_dataout = 80
+# 1670000 dec_enable = 1 dec_datain = 178, dec_kout = 1, dec_dataout = 7c
+# 1690000 dec_enable = 1 dec_datain = 04d, dec_kout = 0, dec_dataout = 7c
+# 1710000 dec_enable = 1 dec_datain = 1a9, dec_kout = 0, dec_dataout = a7
+# 1730000 dec_enable = 1 dec_datain = 25a, dec_kout = 0, dec_dataout = ed
+# 1750000 dec_enable = 1 dec_datain = 23c, dec_kout = 0, dec_dataout = c9
+# 1770000 dec_enable = 1 dec_datain = 179, dec_kout = 0, dec_dataout = 3a
+# 1790000 dec_enable = 1 dec_datain = 0b2, dec_kout = 1, dec_dataout = fc
+# 1810000 dec_enable = 1 dec_datain = 1cb, dec_kout = 0, dec_dataout = a0
+# 1830000 dec_enable = 1 dec_datain = 131, dec_kout = 0, dec_dataout = 12
+# 1850000 dec_enable = 1 dec_datain = 2cd, dec_kout = 0, dec_dataout = eb
+# 1870000 dec_enable = 1 dec_datain = 0ac, dec_kout = 0, dec_dataout = 91
+# 1890000 dec_enable = 1 dec_datain = 359, dec_kout = 0, dec_dataout = 8d
+# 1910000 dec_enable = 1 dec_datain = 349, dec_kout = 0, dec_dataout = 0c
+# 1930000 dec_enable = 1 dec_datain = 171, dec_kout = 0, dec_dataout = 19
+# 1950000 dec_enable = 1 dec_datain = 32c, dec_kout = 0, dec_dataout = 10
+# 1970000 dec_enable = 1 dec_datain = 143, dec_kout = 0, dec_dataout = b1
+# 1990000 dec_enable = 1 dec_datain = 0e5, dec_kout = 0, dec_dataout = 6c
+# 2010000 dec_enable = 1 dec_datain = 139, dec_kout = 1, dec_dataout = 5c
+# 2030000 dec_enable = 1 dec_datain = 2cb, dec_kout = 0, dec_dataout = 65
+# 2050000 dec_enable = 1 dec_datain = 249, dec_kout = 0, dec_dataout = 80
+# 2070000 dec_enable = 1 dec_datain = 17c, dec_kout = 0, dec_dataout = 8b
+# 2090000 dec_enable = 1 dec_datain = 283, dec_kout = 0, dec_dataout = 30
+# 2110000 dec_enable = 1 dec_datain = 17c, dec_kout = 1, dec_dataout = bc
+# 2130000 dec_enable = 1 dec_datain = 283, dec_kout = 1, dec_dataout = bc
+# 2150000 dec_enable = 1 dec_datain = 2d6, dec_kout = 1, dec_dataout = bc
+# 2170000 dec_enable = 1 dec_datain = 095, dec_kout = 1, dec_dataout = bc
+# 2190000 dec_enable = 1 dec_datain = 0dc, dec_kout = 0, dec_dataout = 96
+# 2210000 dec_enable = 1 dec_datain = 05b, dec_kout = 0, dec_dataout = 15
+# 2230000 dec_enable = 1 dec_datain = 1ad, dec_kout = 0, dec_dataout = 7c
+# 2250000 dec_enable = 1 dec_datain = 14e, dec_kout = 1, dec_dataout = fb
+# 2270000 dec_enable = 1 dec_datain = 11c, dec_kout = 0, dec_dataout = c2
+# 2290000 dec_enable = 1 dec_datain = 353, dec_kout = 0, dec_dataout = ae
+# 2310000 dec_enable = 1 dec_datain = 346, dec_kout = 0, dec_dataout = 9c
+# 2330000 dec_enable = 1 dec_datain = 183, dec_kout = 0, dec_dataout = 13
+# 2350000 dec_enable = 1 dec_datain = 297, dec_kout = 0, dec_dataout = 00
+# 2370000 dec_enable = 1 dec_datain = 285, dec_kout = 1, dec_dataout = 3c
+# 2390000 dec_enable = 1 dec_datain = 0b5, dec_kout = 0, dec_dataout = 57
+# 2410000 dec_enable = 1 dec_datain = 157, dec_kout = 0, dec_dataout = 4f
+# 2430000 dec_enable = 1 dec_datain = 313, dec_kout = 0, dec_dataout = 1f
+# 2450000 dec_enable = 1 dec_datain = 191, dec_kout = 0, dec_dataout = b7
+# 2470000 dec_enable = 1 dec_datain = 14d, dec_kout = 0, dec_dataout = 73
+# 2490000 dec_enable = 1 dec_datain = 1ea, dec_kout = 0, dec_dataout = c1
+# 2510000 dec_enable = 1 dec_datain = 12c, dec_kout = 0, dec_dataout = ad
+# 2530000 dec_enable = 1 dec_datain = 29a, dec_kout = 0, dec_dataout = ea
+# 2550000 dec_enable = 1 dec_datain = 0f1, dec_kout = 0, dec_dataout = 8c
+# 2570000 dec_enable = 1 dec_datain = 0cd, dec_kout = 0, dec_dataout = 5a
+# 2590000 dec_enable = 1 dec_datain = 0bc, dec_kout = 0, dec_dataout = 71
+# 2610000 dec_enable = 1 dec_datain = 2ad, dec_kout = 0, dec_dataout = 6d
+# 2630000 dec_enable = 1 dec_datain = 278, dec_kout = 1, dec_dataout = 1c
+# 2650000 dec_enable = 1 dec_datain = 2a8, dec_kout = 0, dec_dataout = 42
+# 2670000 dec_enable = 1 dec_datain = 17c, dec_kout = 0, dec_dataout = 27
+# 2690000 dec_enable = 1 dec_datain = 283, dec_kout = 0, dec_dataout = 57
+# 2710000 dec_enable = 1 dec_datain = 17c, dec_kout = 1, dec_dataout = bc
+# 2730000 dec_enable = 1 dec_datain = 283, dec_kout = 1, dec_dataout = bc
+# 2750000 dec_enable = 1 dec_datain = 28d, dec_kout = 1, dec_dataout = bc
+# 2770000 dec_enable = 1 dec_datain = 2a6, dec_kout = 1, dec_dataout = bc
+# 2790000 dec_enable = 1 dec_datain = 266, dec_kout = 0, dec_dataout = 4d
+# 2810000 dec_enable = 1 dec_datain = 14e, dec_kout = 0, dec_dataout = 46
+# 2830000 dec_enable = 1 dec_datain = 2dc, dec_kout = 0, dec_dataout = 26
+# 2850000 dec_enable = 1 dec_datain = 093, dec_kout = 0, dec_dataout = ae
+# 2870000 dec_enable = 1 dec_datain = 0b9, dec_kout = 0, dec_dataout = 9c
+# 2890000 dec_enable = 1 dec_datain = 27c, dec_kout = 0, dec_dataout = 13
+# $$$ Exit status for testbench tb.demo_dec :  TESTBENCH_PASSED 
+# ** Note: $finish    : D:/JEFF/OpenCores/SGMII/trunk/src/mAltGX/mAlt8b10bdec_tb.v(211)
+#    Time: 2910 ns  Iteration: 1  Instance: /tb

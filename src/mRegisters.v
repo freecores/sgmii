@@ -130,7 +130,7 @@ module mRegisters(
 	assign o_MIIRst_L		= ~r16_CtrlReg0[15];
 	assign o_ANEnable 		= r16_CtrlReg0[12];	
 	assign o_Loopback		= r16_CtrlReg0[14];
-	assign o_GxBPowerDown 	= r16_CtrlReg0[11];
+	assign o_GXBPowerDown 	= r16_CtrlReg0[11];
 	assign o16_LcAdvAbility = w16_LcAdvAbility;
 	
 	assign w16_LcAdvAbility = (w_UseAsSGMII==1'b0)?({1'b0,i16_TxConfigReg[15],r16_CtrlReg4[13:12],3'b000,r16_CtrlReg4[8:7],2'b01,5'b00000})://1000-X mode

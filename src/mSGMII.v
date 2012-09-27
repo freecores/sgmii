@@ -238,7 +238,7 @@ module mSGMII
 	.o_RxCodeCtrl		(w_RxCGCtrl_SyncToRxver	),
 	.o_RxEven			(w_RxEven				),
 	.o_SyncStatus		(w_SyncStatus			),	
-	.o_BitSlip			(),
+	.o_BitSlip			(w_BitSlip),
 	.o_IsComma			(w_IsComma	),
 	.o_OrderedSetValid	(w_OSValid	),
 	.o_IsI1Set			(w_IsI1Set	),
@@ -306,7 +306,7 @@ module mSGMII
 	mANCtrl	u0ANCtrl(
 	.i_Clk				(w_ClkSys			),
 	.i_ARst_L			(w_ARstLogic_L		),
-	.i_Cke				((~i_PwrDown)		),
+	.i_Cke				((~w_GxBPowerDown)		),
 	.i_RestartAN		(w_ANRestart		),
 	.i_SyncStatus		(w_SyncStatus		),
 	.i_ANEnable			(w_ANEnable			),
@@ -342,7 +342,7 @@ module mSGMII
 	
 	assign w_SignalDetect=~w_RxCodeInvalid;
 	
-	mXcver u0Xcver(
+	/*mXcver u0Xcver(
 
 	.i_SerRx			(i_SerRx			),
 	.o_SerTx			(o_SerTx			),
@@ -353,6 +353,28 @@ module mSGMII
 	.i_GxBPwrDwn		(w_GxBPowerDown		),
 	.i_XcverDigitalRst	(~w_ARstLogic_L		),	
 	.o_PllLocked		(w_PllLocked		),
+	
+	.o_SignalDetect		(),
+	.o8_RxCodeGroup		(w8_RxCode			),
+	.o_RxCodeInvalid	(w_RxCodeInvalid	),
+	.o_RxCodeCtrl		(w_RxCodeCtrl		),
+	
+	.i8_TxCodeGroup		(w8_TxCode			),
+	.i_TxCodeValid		(w_TxCodeValid		),
+	.i_TxCodeCtrl		(w_TxCodeCtrl		),
+	.i_TxForceNegDisp	(w_TxForceNegDisp	),
+	.o_RunningDisparity	(w_CurrentParity));*/
+	
+	mAltA5GXlvds u0Xcverlvds(
+	.i_SerRx			(i_SerRx			),
+	.o_SerTx			(o_SerTx			),
+		
+	.i_RefClk125M		(i_RefClk125M		),
+	.o_CoreClk			(w_ClkSys			),
+	.i_GxBPwrDwn		(w_GxBPowerDown		),
+	.i_XcverDigitalRst	(~w_ARstLogic_L		),	
+	.o_PllLocked		(w_PllLocked		),
+	.i_RxBitSlip		(w_BitSlip			),
 	
 	.o_SignalDetect		(),
 	.o8_RxCodeGroup		(w8_RxCode			),
