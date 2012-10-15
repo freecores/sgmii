@@ -55,13 +55,13 @@ module mTransmit(
 	localparam	stEPD2_NOEXT= 24'h040000;	//Second Cycle of EPD, transmitting /R/
 	localparam 	stEPD3		= 24'h080000;	//Third Cycle of EPD, transmitting /R/
 	localparam	stCARR_EXT	= 24'h100000;	//Carrier extension
-	localparam	stALIGN_ERR	= 24'h200000;	//Repeater's state, we don't use this, go straight to START ERR
-	localparam	stSTART_ERR	= 24'h400000;	//Repeater's state
-	localparam	stTX_ERR	= 24'h800000;	//Repeater's state
+	//localparam	stALIGN_ERR	= 24'h200000;	//Repeater's state, we don't use this, go straight to START ERR
+	localparam	stSTART_ERR	= 24'h200000;	//Repeater's state
+	localparam	stTX_ERR	= 24'h400000;	//Repeater's state
 
 	
-	reg	[23:00]	r24_State;
-	reg	[23:00]	w24_NxtState;
+	reg	[22:00]	r13_State;
+	reg	[22:00]	w24_NxtState;
 	
 	
 	wire	w_XmitChange;
@@ -75,7 +75,7 @@ module mTransmit(
 	wire [07:00]	w8_FifoData;
 	wire	w_UpdateXmitChange;
 	wire	w_ResetState;
-	wire	r_ToTxData;				//This signal used in txIDLE_DATA state to comeback to TXIDLE or TXDATA
+	reg 	r_ToTxData;				//This signal used in txIDLE_DATA state to comeback to TXIDLE or TXDATA
 	wire	w_Disparity;
 	wire [09:00] w10_FifoDin;
 	wire [09:00] w10_FifoQ;
@@ -83,9 +83,9 @@ module mTransmit(
 	reg	 [07:00] r8_TxData;
 	
 	assign w_XmitChange = (r3_LstXmit!=i3_Xmit)?1'b1:1'b0;
-	assign w_TxOSIndicate = (r24_State==stCONFIG_C1A||r24_State==stCONFIG_C1B||r24_State==stCONFIG_C1C||
-								r24_State==stCONFIG_C2A||r24_State==stCONFIG_C2B||r24_State==stCONFIG_C2C||
-									r24_State==stTX_IDLE||r24_State==stTX_DATA)?1'b0:1'b1;
+	assign w_TxOSIndicate = (r13_State==stCONFIG_C1A||r13_State==stCONFIG_C1B||r13_State==stCONFIG_C1C||
+								r13_State==stCONFIG_C2A||r13_State==stCONFIG_C2B||r13_State==stCONFIG_C2C||
+									r13_State==stTX_IDLE||r13_State==stTX_DATA)?1'b0:1'b1;
 	//assign w_UpdateXmitChange = 
 	//FIFO
 	assign w10_FifoDin = {i_TxEN,i_TxER,i8_TxD};
@@ -102,32 +102,43 @@ module mTransmit(
 		.i_Clk(i_Clk),
 		.i_ARst_L(i_ARst_L));	
 	//END FIFO
-	assign w_FifoRd = ((w_FifoTxEn && (r24_State==stXMIT_DATA||r24_State==stTX_IDLE)))?1'b0:1'b1;
+	assign w_FifoRd = ((w_FifoTxEn && (r13_State==stXMIT_DATA||r13_State==stTX_IDLE)))?1'b0:1'b1;
 	
 	always@(posedge i_Clk or negedge i_ARst_L)
 	if(i_ARst_L==1'b0) begin
-		r24_State 	<= stTX_TEST;
-		r3_LstXmit  <= 3'b000;
+		r13_State 	<= stTX_TEST;
+		r3_LstXmit  <= `cXmitIDLE;
 		r_TxEven	<= 1'b0;
+		o_TxEven 	<= 1'b1;
 		end
 	else
 		begin
 		if(w_UpdateXmitChange) r3_LstXmit <= i3_Xmit;				
-		r24_State <= w24_NxtState;
+		if(w_ResetState)
+			r13_State <= stTX_TEST;
+		else 
+			r13_State <= w24_NxtState;
 		r_TxEven <= ~r_TxEven;
 		o_TxEven <= r_TxEven;
 		end
 	
+	// always@(posedge i_Clk or posedge w_ResetState)
+	// if(w_ResetState)
+		// r13_State <= stTX_TEST;	
+	// else 
+		// r13_State <= w24_NxtState;
+		
+	
 	assign w_UpdateXmitChange = w_ResetState;
-	assign w_ResetState = (i_ARst_L==1'b0)||(w_XmitChange && (r_TxEven==1'b0) && w_TxOSIndicate);
+	assign w_ResetState = (i_ARst_L==1'b0)||(w_XmitChange && (o_TxEven==1'b0) && w_TxOSIndicate);
 	assign w_Disparity = i_CurrentParity;
 	always@(*)
 	begin
-		if(w_ResetState)
-		r24_State <= stTX_TEST;
-		case(r24_State)
-		stTX_TEST		: 	if(i3_Xmit==`cXmitCONFIG && r_TxEven==1'b0) w24_NxtState <= stCONFIG_C1A; else
-							if(i3_Xmit==`cXmitIDLE || (i3_Xmit==`cXmitDATA && (w_FifoTxEn || w_FifoTxEr))) w24_NxtState <= stTX_IDLE; else
+		
+		// else
+		case(r13_State)
+		stTX_TEST		: 	if(i3_Xmit==`cXmitCONFIG && o_TxEven==1'b0) w24_NxtState <= stCONFIG_C1A; else
+							if((i3_Xmit==`cXmitIDLE &&(~o_TxEven)) || ((~o_TxEven) && i3_Xmit==`cXmitDATA && (w_FifoTxEn || w_FifoTxEr))) w24_NxtState <= stTX_IDLE; else
 							if(i3_Xmit==`cXmitDATA && (~w_FifoTxEn) && (~w_FifoTxEr)) w24_NxtState <= stXMIT_DATA;
 							else w24_NxtState <= stTX_TEST;		
 		stCONFIG_C1A	:	w24_NxtState <= stCONFIG_C1B;
@@ -219,14 +230,16 @@ module mTransmit(
 		stTX_IDLE		: 	begin 
 							o8_TxCodeGroupOut <= `K28_5; 
 							o_TxCodeCtrl	<= 1'b1;
+							r_ToTxData <= 1'b0;
 							end
 		stIDLE_DATA		: 	begin
-							o8_TxCodeGroupOut <= (w_Disparity==1'b0)?`D5_6:`D16_2;//Disparity = 0 means positive
+							o8_TxCodeGroupOut <= (w_Disparity==1'b1)?`D5_6:`D16_2;//Disparity = 1 means positive
 							o_TxCodeCtrl	<= 1'b0;							
 							end
 		stXMIT_DATA		: 	begin 
 							o8_TxCodeGroupOut <= `K28_5; 
 							o_TxCodeCtrl	<= 1'b1;
+							r_ToTxData <= 1'b1;
 							end
 		stTX_DATA		: 	if(((~w_FifoTxEn) & w_FifoTxEr & w8_FifoData != 8'h0F)||(w_FifoTxEn & w_FifoTxEr))
 							begin
@@ -304,7 +317,7 @@ module mTransmit(
 //synthesis translate_off	
 	reg [239:0] r240_TxStateName;
 	always@(*)
-	case(r24_State)
+	case(r13_State)
 	stTX_TEST 		: r240_TxStateName<="stTX_TEST 	";
 	stCONFIG_C1A    : r240_TxStateName<="stCONFIG_C1A";
 	stCONFIG_C1B    : r240_TxStateName<="stCONFIG_C1B";
@@ -326,7 +339,7 @@ module mTransmit(
 	stEPD2_NOEXT    : r240_TxStateName<="stEPD2_NOEXT";
 	stEPD3		    : r240_TxStateName<="stEPD3		 ";
 	stCARR_EXT	    : r240_TxStateName<="stCARR_EXT	 ";
-	stALIGN_ERR	    : r240_TxStateName<="stALIGN_ERR";
+	//stALIGN_ERR	    : r240_TxStateName<="stALIGN_ERR";
 	stSTART_ERR	    : r240_TxStateName<="stSTART_ERR";
 	stTX_ERR	    : r240_TxStateName<="stTX_ERR	 ";
 	endcase

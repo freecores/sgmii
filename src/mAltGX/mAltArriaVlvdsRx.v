@@ -37,37 +37,44 @@
 `timescale 1 ps / 1 ps
 // synopsys translate_on
 module mAltArriaVlvdsRx (
+	pll_areset,
 	rx_channel_data_align,
 	rx_in,
 	rx_inclock,
+	rx_divfwdclk,
 	rx_locked,
 	rx_out,
 	rx_outclock);
 
+	input	  pll_areset;
 	input	[0:0]  rx_channel_data_align;
 	input	[0:0]  rx_in;
 	input	  rx_inclock;
+	output	[0:0]  rx_divfwdclk;
 	output	  rx_locked;
 	output	[9:0]  rx_out;
 	output	  rx_outclock;
 
-	wire  sub_wire0;
-	wire [9:0] sub_wire1;
-	wire  sub_wire2;
-	wire  rx_locked = sub_wire0;
-	wire [9:0] rx_out = sub_wire1[9:0];
-	wire  rx_outclock = sub_wire2;
+	wire [0:0] sub_wire0;
+	wire  sub_wire1;
+	wire [9:0] sub_wire2;
+	wire  sub_wire3;
+	wire [0:0] rx_divfwdclk = sub_wire0[0:0];
+	wire  rx_locked = sub_wire1;
+	wire [9:0] rx_out = sub_wire2[9:0];
+	wire  rx_outclock = sub_wire3;
 
 	altlvds_rx	ALTLVDS_RX_component (
 				.rx_in (rx_in),
 				.rx_inclock (rx_inclock),
+				.pll_areset (pll_areset),
 				.rx_channel_data_align (rx_channel_data_align),
-				.rx_locked (sub_wire0),
-				.rx_out (sub_wire1),
-				.rx_outclock (sub_wire2),
+				.rx_divfwdclk (sub_wire0),
+				.rx_locked (sub_wire1),
+				.rx_out (sub_wire2),
+				.rx_outclock (sub_wire3),
 				.dpa_pll_cal_busy (),
 				.dpa_pll_recal (1'b0),
-				.pll_areset (1'b0),
 				.pll_phasecounterselect (),
 				.pll_phasedone (1'b1),
 				.pll_phasestep (),
@@ -80,7 +87,6 @@ module mAltArriaVlvdsRx (
 				.rx_data_align_reset (1'b0),
 				.rx_data_reset (1'b0),
 				.rx_deskew (1'b0),
-				.rx_divfwdclk (),
 				.rx_dpa_lock_reset (1'b0),
 				.rx_dpa_locked (),
 				.rx_dpaclock (1'b0),
@@ -96,7 +102,7 @@ module mAltArriaVlvdsRx (
 	defparam
 		ALTLVDS_RX_component.buffer_implementation = "RAM",
 		ALTLVDS_RX_component.cds_mode = "UNUSED",
-		ALTLVDS_RX_component.common_rx_tx_pll = "OFF",
+		ALTLVDS_RX_component.common_rx_tx_pll = "ON",
 		ALTLVDS_RX_component.data_align_rollover = 10,
 		ALTLVDS_RX_component.data_rate = "1250.0 Mbps",
 		ALTLVDS_RX_component.deserialization_factor = 10,
@@ -108,9 +114,9 @@ module mAltArriaVlvdsRx (
 		ALTLVDS_RX_component.enable_dpa_calibration = "ON",
 		ALTLVDS_RX_component.enable_dpa_fifo = "UNUSED",
 		ALTLVDS_RX_component.enable_dpa_initial_phase_selection = "OFF",
-		ALTLVDS_RX_component.enable_dpa_mode = "OFF",
+		ALTLVDS_RX_component.enable_dpa_mode = "ON",
 		ALTLVDS_RX_component.enable_dpa_pll_calibration = "OFF",
-		ALTLVDS_RX_component.enable_soft_cdr_mode = "OFF",
+		ALTLVDS_RX_component.enable_soft_cdr_mode = "ON",
 		ALTLVDS_RX_component.implement_in_les = "OFF",
 		ALTLVDS_RX_component.inclock_boost = 0,
 		ALTLVDS_RX_component.inclock_data_alignment = "EDGE_ALIGNED",
@@ -131,7 +137,7 @@ module mAltArriaVlvdsRx (
 		ALTLVDS_RX_component.registered_data_align_input = "UNUSED",
 		ALTLVDS_RX_component.registered_output = "ON",
 		ALTLVDS_RX_component.reset_fifo_at_first_lock = "UNUSED",
-		ALTLVDS_RX_component.rx_align_data_reg = "RISING_EDGE",
+		ALTLVDS_RX_component.rx_align_data_reg = "UNUSED",
 		ALTLVDS_RX_component.sim_dpa_is_negative_ppm_drift = "OFF",
 		ALTLVDS_RX_component.sim_dpa_net_ppm_variation = 0,
 		ALTLVDS_RX_component.sim_dpa_output_clock_phase_shift = 0,
@@ -156,7 +162,7 @@ endmodule
 // Retrieval info: PRIVATE: Deser_Factor NUMERIC "10"
 // Retrieval info: PRIVATE: Dpll_Lock_Count NUMERIC "0"
 // Retrieval info: PRIVATE: Dpll_Lock_Window NUMERIC "0"
-// Retrieval info: PRIVATE: Enable_DPA_Mode STRING "OFF"
+// Retrieval info: PRIVATE: Enable_DPA_Mode STRING "ON"
 // Retrieval info: PRIVATE: Enable_FIFO_DPA_Channels NUMERIC "0"
 // Retrieval info: PRIVATE: Ext_PLL STRING "OFF"
 // Retrieval info: PRIVATE: INTENDED_DEVICE_FAMILY STRING "Arria V"
@@ -172,15 +178,15 @@ endmodule
 // Retrieval info: PRIVATE: Reg_InOut NUMERIC "1"
 // Retrieval info: PRIVATE: Use_Cda_Reset NUMERIC "0"
 // Retrieval info: PRIVATE: Use_Clock_Resc STRING "Dual-Regional clock"
-// Retrieval info: PRIVATE: Use_Common_Rx_Tx_Plls NUMERIC "0"
+// Retrieval info: PRIVATE: Use_Common_Rx_Tx_Plls NUMERIC "1"
 // Retrieval info: PRIVATE: Use_Data_Align NUMERIC "1"
 // Retrieval info: PRIVATE: Use_Lock NUMERIC "1"
-// Retrieval info: PRIVATE: Use_Pll_Areset NUMERIC "0"
+// Retrieval info: PRIVATE: Use_Pll_Areset NUMERIC "1"
 // Retrieval info: PRIVATE: Use_Rawperror NUMERIC "0"
 // Retrieval info: PRIVATE: Use_Tx_Out_Phase NUMERIC "0"
 // Retrieval info: CONSTANT: BUFFER_IMPLEMENTATION STRING "RAM"
 // Retrieval info: CONSTANT: CDS_MODE STRING "UNUSED"
-// Retrieval info: CONSTANT: COMMON_RX_TX_PLL STRING "OFF"
+// Retrieval info: CONSTANT: COMMON_RX_TX_PLL STRING "ON"
 // Retrieval info: CONSTANT: clk_src_is_pll STRING "off"
 // Retrieval info: CONSTANT: DATA_ALIGN_ROLLOVER NUMERIC "10"
 // Retrieval info: CONSTANT: DATA_RATE STRING "1250.0 Mbps"
@@ -193,9 +199,9 @@ endmodule
 // Retrieval info: CONSTANT: ENABLE_DPA_CALIBRATION STRING "ON"
 // Retrieval info: CONSTANT: ENABLE_DPA_FIFO STRING "UNUSED"
 // Retrieval info: CONSTANT: ENABLE_DPA_INITIAL_PHASE_SELECTION STRING "OFF"
-// Retrieval info: CONSTANT: ENABLE_DPA_MODE STRING "OFF"
+// Retrieval info: CONSTANT: ENABLE_DPA_MODE STRING "ON"
 // Retrieval info: CONSTANT: ENABLE_DPA_PLL_CALIBRATION STRING "OFF"
-// Retrieval info: CONSTANT: ENABLE_SOFT_CDR_MODE STRING "OFF"
+// Retrieval info: CONSTANT: ENABLE_SOFT_CDR_MODE STRING "ON"
 // Retrieval info: CONSTANT: IMPLEMENT_IN_LES STRING "OFF"
 // Retrieval info: CONSTANT: INCLOCK_BOOST NUMERIC "0"
 // Retrieval info: CONSTANT: INCLOCK_DATA_ALIGNMENT STRING "EDGE_ALIGNED"
@@ -216,7 +222,7 @@ endmodule
 // Retrieval info: CONSTANT: REGISTERED_DATA_ALIGN_INPUT STRING "UNUSED"
 // Retrieval info: CONSTANT: REGISTERED_OUTPUT STRING "ON"
 // Retrieval info: CONSTANT: RESET_FIFO_AT_FIRST_LOCK STRING "UNUSED"
-// Retrieval info: CONSTANT: RX_ALIGN_DATA_REG STRING "RISING_EDGE"
+// Retrieval info: CONSTANT: RX_ALIGN_DATA_REG STRING "UNUSED"
 // Retrieval info: CONSTANT: SIM_DPA_IS_NEGATIVE_PPM_DRIFT STRING "OFF"
 // Retrieval info: CONSTANT: SIM_DPA_NET_PPM_VARIATION NUMERIC "0"
 // Retrieval info: CONSTANT: SIM_DPA_OUTPUT_CLOCK_PHASE_SHIFT NUMERIC "0"
@@ -225,8 +231,12 @@ endmodule
 // Retrieval info: CONSTANT: USE_EXTERNAL_PLL STRING "OFF"
 // Retrieval info: CONSTANT: USE_NO_PHASE_SHIFT STRING "ON"
 // Retrieval info: CONSTANT: X_ON_BITSLIP STRING "ON"
+// Retrieval info: USED_PORT: pll_areset 0 0 0 0 INPUT NODEFVAL "pll_areset"
+// Retrieval info: CONNECT: @pll_areset 0 0 0 0 pll_areset 0 0 0 0
 // Retrieval info: USED_PORT: rx_channel_data_align 0 0 1 0 INPUT NODEFVAL "rx_channel_data_align[0..0]"
 // Retrieval info: CONNECT: @rx_channel_data_align 0 0 1 0 rx_channel_data_align 0 0 1 0
+// Retrieval info: USED_PORT: rx_divfwdclk 0 0 1 0 OUTPUT NODEFVAL "rx_divfwdclk[0..0]"
+// Retrieval info: CONNECT: rx_divfwdclk 0 0 1 0 @rx_divfwdclk 0 0 1 0
 // Retrieval info: USED_PORT: rx_in 0 0 1 0 INPUT NODEFVAL "rx_in[0..0]"
 // Retrieval info: CONNECT: @rx_in 0 0 1 0 rx_in 0 0 1 0
 // Retrieval info: USED_PORT: rx_inclock 0 0 0 0 INPUT NODEFVAL "rx_inclock"

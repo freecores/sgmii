@@ -103,14 +103,14 @@ integer tstcfg_RxPktCnt;
 				$display("------------------------------------");
 				$display("-------Subtleware Ltd Pte 2012------");
 				$display("--Testing SGMII in 1000Gb Mode------");
-				$display("------------------------------------");
-				u0WishboneMstr.tsk_Read((10<<2),r16_CoreVersion);
-				$display("---Core Version : %x", r16_CoreVersion);
+				$display("------------------------------------");				
 				tstcfg_TxPktCnt = 0;
 				tstcfg_RxPktCnt = 0;
 				r_Reset_L <= 1'b0;
 				#1000;
 				r_Reset_L <= 1'b1;	
+				u0WishboneMstr.tsk_Read((10<<2),r16_CoreVersion);
+				$display("---Core Version : %x", r16_CoreVersion);
 				tsk_Setup();
 			end
 	

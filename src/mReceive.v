@@ -61,23 +61,22 @@ localparam 	stWAIT_FOR_K 	= 21'h000001,
 			stRX_CD			= 21'h000010,
 			stRX_INVALID	= 21'h000020,
 			stIDLE_D		= 21'h000040,
-			stCARRIER_DTEC	= 21'h000080,
-			stFALSE_CARRIER = 21'h000100,
-			stSTART_OF_PKT	= 21'h000200,
-			stRECEIVE		= 21'h000400,
-			stEARLY_END		= 21'h000800,
-			stTRI_RRI		= 21'h001000,
-			stTRR_EXTEND	= 21'h002000,
-			stEPD2_CHK_END	= 21'h004000,
-			stPKT_BURST_RRS	= 21'h008000,
-			stRX_DATA_ERR	= 21'h010000,
-			stRX_DATA		= 21'h020000,
-			stEARLY_END_EXT	= 21'h040000,
-			stEXT_ERROR		= 21'h080000,
-			stLINK_FAILED	= 21'h100000;
+			stFALSE_CARRIER = 21'h000080,
+			stSTART_OF_PKT	= 21'h000100,
+			stEARLY_END		= 21'h000200,
+			stTRI_RRI		= 21'h000400,
+			stTRR_EXTEND	= 21'h000800,
+			stPKT_BURST_RRS	= 21'h001000,
+			stRX_DATA_ERR	= 21'h002000,
+			stRX_DATA		= 21'h004000,
+			stEARLY_END_EXT	= 21'h008000,
+			stEXT_ERROR		= 21'h010000;
 			
-reg		[20:00]	r21_State;
-reg		[20:00] r21_NxtState;
+			
+			
+			
+reg		[16:00]	r17_State;
+reg		[16:00] r21_NxtState;
 
 wire 	wSUDIK28_5;
 wire	wSUDID21_5;
@@ -98,7 +97,7 @@ wire	w_IsVSet;
 	reg [8*30-1:0] rvStateName;
 	always@(*)
 	begin
-		case(r21_State)
+		case(r17_State)
 		stWAIT_FOR_K 	:	rvStateName <= "Wait For K";
 		stRX_K 			:	rvStateName <= "RX K";
 		stRX_CB			:	rvStateName <= "RX CB";
@@ -106,20 +105,20 @@ wire	w_IsVSet;
 		stRX_CD			:	rvStateName <= "RX CD";
 		stRX_INVALID	:	rvStateName <= "RX Invalid";
 		stIDLE_D		:	rvStateName <= "IDLE D";
-		stCARRIER_DTEC	:	rvStateName <= "CARRIER DETECT";
+		//stCARRIER_DTEC	:	rvStateName <= "CARRIER DETECT";
 		stFALSE_CARRIER :	rvStateName <= "FALSE CARRIER";
 		stSTART_OF_PKT	:	rvStateName <= "Start of Packet";
-		stRECEIVE		:	rvStateName <= "Receiving";
+		//stRECEIVE		:	rvStateName <= "Receiving";
 		stEARLY_END		:	rvStateName <= "Early End";
 		stTRI_RRI		:	rvStateName <= "TRI RRI";
 		stTRR_EXTEND	:	rvStateName <= "TRR Extend";
-		stEPD2_CHK_END	:	rvStateName <= "EPD2 Check End";
+		//stEPD2_CHK_END	:	rvStateName <= "EPD2 Check End";
 		stPKT_BURST_RRS	:	rvStateName <= "PKT BURST RRS";
 		stRX_DATA_ERR	:	rvStateName <= "RX DATA Error";
 		stRX_DATA		:	rvStateName <= "RX DATA";
 		stEARLY_END_EXT	:	rvStateName <= "Early End Ext";
 		stEXT_ERROR		:	rvStateName <= "Ext Error";
-		stLINK_FAILED	:	rvStateName <= "Link Failed";
+		//stLINK_FAILED	:	rvStateName <= "Link Failed";
 		endcase
 		//$display("mReceive State: %s",rvStateName);
 	end
@@ -132,9 +131,9 @@ wire	w_IsVSet;
 	
 	always@(posedge i_Clk or negedge i_ARst_L)
 	if(i_ARst_L==1'b0) begin
-		r21_State <= stWAIT_FOR_K;
+		r17_State <= stWAIT_FOR_K;
 	end else begin	
-		r21_State <= r21_NxtState;
+		r17_State <= r21_NxtState;
 	end
 	
 	assign wSUDIK28_5 = (!i_RxCodeInvalid) && (i_RxCodeCtrl) && (i8_RxCodeGroupIn==`K28_5);
@@ -142,7 +141,7 @@ wire	w_IsVSet;
 	assign wSUDID2_2 = (!i_RxCodeInvalid) && (!i_RxCodeCtrl) && (i8_RxCodeGroupIn==`D2_2);
 	always@(*)
 	begin
-		case(r21_State)
+		case(r17_State)
 		stWAIT_FOR_K: if(i_IsComma && i_RxEven) r21_NxtState <= stRX_K; else r21_NxtState<=stWAIT_FOR_K;
 		stRX_K		: if(wSUDID21_5||wSUDID2_2)
 						r21_NxtState <= stRX_CB; else
@@ -240,9 +239,9 @@ wire	w_IsVSet;
 		endcase
 	end
 
-	assign o_RUDIConfig = (r21_State==stRX_CD		)?1'b1:1'b0;
-	assign o_RUDIIdle 	= (r21_State==stIDLE_D		)?1'b1:1'b0;
-	assign o_RUDIInvalid= (r21_State==stRX_INVALID && i3_Xmit==`cXmitCONFIG)?1'b1:1'b0;
+	assign o_RUDIConfig = (r17_State==stRX_CD		)?1'b1:1'b0;
+	assign o_RUDIIdle 	= (r17_State==stIDLE_D		)?1'b1:1'b0;
+	assign o_RUDIInvalid= (r17_State==stRX_INVALID && i3_Xmit==`cXmitCONFIG)?1'b1:1'b0;
 
 	always@(posedge i_Clk or negedge i_ARst_L)
 	if(i_ARst_L==1'b0) begin
@@ -308,18 +307,18 @@ wire	w_IsVSet;
 							o_RxDV		<= 1'b0;
 							o8_RxD		<= 8'b0001_1111;							
 							end
-		stLINK_FAILED	:	begin
-							if(o_Receiving==1'b1) 
-								begin 
-								o_Receiving <= 1'b0;
-								o_RxER <= 1'b1; 
-								end else
-								begin
-								o_RxDV <= 1'b0;
-								o_RxER <= 1'b0;
-								end
-							if(i3_Xmit!=`cXmitDATA) 	o_Invalid <= 1'b1;
-							end
+		// stLINK_FAILED	:	begin
+							// if(o_Receiving==1'b1) 
+								// begin 
+								// o_Receiving <= 1'b0;
+								// o_RxER <= 1'b1; 
+								// end else
+								// begin
+								// o_RxDV <= 1'b0;
+								// o_RxER <= 1'b0;
+								// end
+							// if(i3_Xmit!=`cXmitDATA) 	o_Invalid <= 1'b1;
+							// end
 		endcase
 	end
 	

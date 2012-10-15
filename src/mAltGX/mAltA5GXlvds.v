@@ -26,8 +26,10 @@ module mAltA5GXlvds (
 	wire [9:0]	w10_rxdata;
 	wire [9:0] 	w10_txdatalocal;
 	wire [9:0] 	w10_rxdatalocal;
+	wire w_RxKErr,w_RxRdErr;
+	wire w_TxClk;
 	
-	mAlt8b10benc u8b10bEnc(
+	/*mAlt8b10benc u8b10bEnc(
 	.clk			(o_CoreClk),
 	.reset_n		(~i_XcverDigitalRst),
 	.idle_ins		(~i_TxCodeValid),
@@ -40,9 +42,19 @@ module mAltA5GXlvds (
 	.dataout		(w10_txdatalocal),
 	.valid			(),
 	.rdout			(o_RunningDisparity),
-	.rdcascade		());	
+	.rdcascade		());*/
+	mEnc8b10bMem u8b10bEnc(
+	.i8_Din				(i8_TxCodeGroup),		//HGFEDCBA
+	.i_Kin				(i_TxCodeCtrl),
+	.i_ForceDisparity	(i_TxForceNegDisp),
+	.i_Disparity		(~i_TxForceNegDisp),		//1 Is negative, 0 is positive	
+	.o10_Dout			(w10_txdata),	//abcdeifghj
+	.o_Rd				(o_RunningDisparity),
+	.o_KErr				(),
+	.i_Clk				(o_CoreClk),
+	.i_ARst_L			(~i_XcverDigitalRst));
 	
-	mAlt8b10bdec 	u8b10bDec(	
+	/*mAlt8b10bdec 	u8b10bDec(	
 	.clk			(o_CoreClk),
 	.reset_n		(~i_XcverDigitalRst),
 	.idle_del		(),
@@ -56,10 +68,23 @@ module mAltA5GXlvds (
 	.kerr			(w_RxKErr),
 	.rdcascade		(),
 	.rdout			(),
-	.rderr			(w_RxRdErr));
+	.rderr			(w_RxRdErr));*/
+	
+	mDec8b10bMem u8b10bDec(
+	.o8_Dout			(o8_RxCodeGroup),		//HGFEDCBA
+	.o_Kout				(o_RxCodeCtrl),
+	.o_DErr				(),
+	.o_KErr				(w_RxKErr),
+	.o_DpErr			(w_RxRdErr),
+	.i_ForceDisparity 	(1'b0),
+	.i_Disparity		(1'b0),		
+	.i10_Din			(w10_rxdata),	//abcdeifghj
+	.o_Rd				(),	
+	.i_Clk				(o_CoreClk),
+	.i_ARst_L			(~i_XcverDigitalRst));
 	
 	assign o_RxCodeInvalid = w_RxKErr|w_RxRdErr;
-	assign o_SignalDetect = w_RxDataValid|o_RxCodeCtrl;
+	assign o_SignalDetect = (~o_RxCodeInvalid)|o_RxCodeCtrl;
 	
 	mAltArriaVlvdsRx ulvdsrx (
 	.rx_channel_data_align (i_RxBitSlip),
@@ -67,13 +92,16 @@ module mAltA5GXlvds (
 	.rx_inclock		(i_RefClk125M),
 	.rx_out			(w10_rxdata),
 	.rx_locked		(o_PllLocked),
-	.rx_outclock	(o_CoreClk));
+	//.rx_outclock	(o_CoreClk),
+	.rx_divfwdclk	(o_CoreClk),
+	.pll_areset		(i_XcverDigitalRst));
 	
 	mAltArriaVlvdsTx ulvdstx(
 	.tx_in			(w10_txdata),
-	.tx_inclock		(i_RefClk125M),	
-	.tx_coreclock	(w_TxClk),
-	.tx_out			(o_SerTx));
+	.tx_inclock		(o_CoreClk),	
+	//.tx_coreclock	(w_TxClk),
+	.tx_out			(o_SerTx),
+	.pll_areset(i_XcverDigitalRst));
 	
 	
 	function [9:0] bitreverse ;
@@ -85,8 +113,8 @@ module mAltA5GXlvds (
 		end
 	endfunction
 	
-	assign w10_txdata = bitreverse(w10_txdatalocal);
-	assign w10_rxdatalocal = bitreverse(w10_rxdata);
+	//assign w10_txdata = bitreverse(w10_txdatalocal);
+	//assign w10_rxdatalocal = bitreverse(w10_rxdata);
 	// mAltRateAdapter uRxAdapter(
 	// .data	(w10_txdatalocal),
 	// .rdclk	(w_TxClk),

@@ -1,7 +1,7 @@
 
 set incDir {../src+../src/mAltGX}
 set srcDir {../src}
-set SrcFiles {mANCtrl.v mReceive.v mTransmit.v mSyncCtrl.v mSGMII.v mXcver.v mSyncFifo.v mRegisters.v mClkBuf.v mRateAdapter.v}
+set SrcFiles {mANCtrl.v mReceive.v mTransmit.v mSyncCtrl.v mSGMII.v mXcver.v mSyncFifo.v mRegisters.v mClkBuf.v mRateAdapter.v mEnc8b10bMem.v mDec8b10bMem.v}
 set BfmDir {./BFMs}
 set BfmFiles {mWishboneMstr.v}
 foreach src $SrcFiles {

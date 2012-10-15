@@ -1,5 +1,20 @@
 /*
-Developed By Subtleware Corporation Pte Ltd 2011
+	Copyright � 2012 JeffLieu-lieumychuong@gmail.com
+	
+	This file is part of SGMII-IP-Core.
+    SGMII-IP-Core is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    SGMII-IP-Core is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with SGMII-IP-Core.  If not, see <http://www.gnu.org/licenses/>.
+
 File		:
 Description	:	
 Remarks		:	No Support for Next Page
@@ -97,7 +112,7 @@ module mANCtrl(
 								else if(w_LinkTimerDone && (~w_AbiMatch||(r16_LpAdvAbility!=16'h0000)))
 												r8_State <= stIDLE_DTECT;								
 			stIDLE_DTECT	:	if(w_IdleMatch && w_LinkTimerDone) r8_State <= stLINK_OK; else		
-									if(w_IdleMatch && r16_LpAdvAbility==16'h0000) r8_State <= stAN_ENABLE;
+									if(w_AbiMatch && r16_LpAdvAbility==16'h0000) r8_State <= stAN_ENABLE;
 						
 			stLINK_OK		:	if(w_AbiMatch) r8_State <= stAN_ENABLE;
 			stAN_DIS_LINKOK	:	r8_State <= stAN_DIS_LINKOK;	
@@ -182,7 +197,7 @@ module mANCtrl(
 					if(r2_AcknowlMatchCnt!=2'b11) r2_AcknowlMatchCnt<=r2_AcknowlMatchCnt+1;
 					//Consistency Match
 					//When the flag acknowledge match is about to be set
-					//If the bits are same as r16_AbilityReg , consistent
+					//If the bits are same as r16_LpAdvAbility , consistent
 					//Else Not consistent;
 					//Consistency match is set at the same time as Acknowledge match
 					if(r2_AcknowlMatchCnt==2'b10 && (i16_RxConfigReg[13:00] == r16_AbilityReg[13:00] && i16_RxConfigReg[15]==r16_AbilityReg[15]))

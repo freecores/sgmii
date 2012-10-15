@@ -37,28 +37,26 @@
 `timescale 1 ps / 1 ps
 // synopsys translate_on
 module mAltArriaVlvdsTx (
+	pll_areset,
 	tx_in,
 	tx_inclock,
-	tx_coreclock,
 	tx_out);
 
+	input	  pll_areset;
 	input	[9:0]  tx_in;
 	input	  tx_inclock;
-	output	  tx_coreclock;
 	output	[0:0]  tx_out;
 
-	wire  sub_wire0;
-	wire [0:0] sub_wire1;
-	wire  tx_coreclock = sub_wire0;
-	wire [0:0] tx_out = sub_wire1[0:0];
+	wire [0:0] sub_wire0;
+	wire [0:0] tx_out = sub_wire0[0:0];
 
 	altlvds_tx	ALTLVDS_TX_component (
+				.pll_areset (pll_areset),
 				.tx_in (tx_in),
 				.tx_inclock (tx_inclock),
-				.tx_coreclock (sub_wire0),
-				.tx_out (sub_wire1),
-				.pll_areset (1'b0),
+				.tx_out (sub_wire0),
 				.sync_inclock (1'b0),
+				.tx_coreclock (),
 				.tx_data_reset (1'b0),
 				.tx_enable (1'b1),
 				.tx_locked (),
@@ -67,7 +65,7 @@ module mAltArriaVlvdsTx (
 				.tx_syncclock (1'b0));
 	defparam
 		ALTLVDS_TX_component.center_align_msb = "UNUSED",
-		ALTLVDS_TX_component.common_rx_tx_pll = "ON",
+		ALTLVDS_TX_component.common_rx_tx_pll = "OFF",
 		ALTLVDS_TX_component.coreclock_divide_by = 1,
 		ALTLVDS_TX_component.data_rate = "1250.0 Mbps",
 		ALTLVDS_TX_component.deserialization_factor = 10,
@@ -93,7 +91,7 @@ module mAltArriaVlvdsTx (
 		ALTLVDS_TX_component.pll_self_reset_on_loss_lock = "OFF",
 		ALTLVDS_TX_component.preemphasis_setting = 0,
 		ALTLVDS_TX_component.refclk_frequency = "125.000000 MHz",
-		ALTLVDS_TX_component.registered_input = "TX_CORECLK",
+		ALTLVDS_TX_component.registered_input = "TX_CLKIN",
 		ALTLVDS_TX_component.use_external_pll = "OFF",
 		ALTLVDS_TX_component.use_no_phase_shift = "ON",
 		ALTLVDS_TX_component.vod_setting = 0,
@@ -106,20 +104,20 @@ endmodule
 // CNX file retrieval info
 // ============================================================
 // Retrieval info: LIBRARY: altera_mf altera_mf.altera_mf_components.all
-// Retrieval info: PRIVATE: CNX_CLOCK_CHOICES STRING "tx_coreclock"
+// Retrieval info: PRIVATE: CNX_CLOCK_CHOICES STRING "tx_inclock"
 // Retrieval info: PRIVATE: CNX_CLOCK_MODE NUMERIC "0"
-// Retrieval info: PRIVATE: CNX_COMMON_PLL NUMERIC "1"
+// Retrieval info: PRIVATE: CNX_COMMON_PLL NUMERIC "0"
 // Retrieval info: PRIVATE: CNX_DATA_RATE STRING "1250.0"
 // Retrieval info: PRIVATE: CNX_DESER_FACTOR NUMERIC "10"
 // Retrieval info: PRIVATE: CNX_EXT_PLL STRING "OFF"
 // Retrieval info: PRIVATE: CNX_LE_SERDES STRING "OFF"
 // Retrieval info: PRIVATE: CNX_NUM_CHANNEL NUMERIC "1"
 // Retrieval info: PRIVATE: CNX_OUTCLOCK_DIVIDE_BY NUMERIC "1"
-// Retrieval info: PRIVATE: CNX_PLL_ARESET NUMERIC "0"
+// Retrieval info: PRIVATE: CNX_PLL_ARESET NUMERIC "1"
 // Retrieval info: PRIVATE: CNX_PLL_FREQ STRING "125.000000"
 // Retrieval info: PRIVATE: CNX_PLL_PERIOD STRING "8.000"
 // Retrieval info: PRIVATE: CNX_REG_INOUT NUMERIC "1"
-// Retrieval info: PRIVATE: CNX_TX_CORECLOCK STRING "ON"
+// Retrieval info: PRIVATE: CNX_TX_CORECLOCK STRING "OFF"
 // Retrieval info: PRIVATE: CNX_TX_LOCKED STRING "OFF"
 // Retrieval info: PRIVATE: CNX_TX_OUTCLOCK STRING "OFF"
 // Retrieval info: PRIVATE: CNX_USE_CLOCK_RESC STRING "Regional clock"
@@ -130,7 +128,7 @@ endmodule
 // Retrieval info: PRIVATE: pINCLOCK_PHASE_SHIFT STRING "0.00"
 // Retrieval info: PRIVATE: pOUTCLOCK_PHASE_SHIFT STRING "0.00"
 // Retrieval info: CONSTANT: CENTER_ALIGN_MSB STRING "UNUSED"
-// Retrieval info: CONSTANT: COMMON_RX_TX_PLL STRING "ON"
+// Retrieval info: CONSTANT: COMMON_RX_TX_PLL STRING "OFF"
 // Retrieval info: CONSTANT: CORECLOCK_DIVIDE_BY NUMERIC "1"
 // Retrieval info: CONSTANT: clk_src_is_pll STRING "off"
 // Retrieval info: CONSTANT: DATA_RATE STRING "1250.0 Mbps"
@@ -157,12 +155,12 @@ endmodule
 // Retrieval info: CONSTANT: PLL_SELF_RESET_ON_LOSS_LOCK STRING "OFF"
 // Retrieval info: CONSTANT: PREEMPHASIS_SETTING NUMERIC "0"
 // Retrieval info: CONSTANT: REFCLK_FREQUENCY STRING "125.000000 MHz"
-// Retrieval info: CONSTANT: REGISTERED_INPUT STRING "TX_CORECLK"
+// Retrieval info: CONSTANT: REGISTERED_INPUT STRING "TX_CLKIN"
 // Retrieval info: CONSTANT: USE_EXTERNAL_PLL STRING "OFF"
 // Retrieval info: CONSTANT: USE_NO_PHASE_SHIFT STRING "ON"
 // Retrieval info: CONSTANT: VOD_SETTING NUMERIC "0"
-// Retrieval info: USED_PORT: tx_coreclock 0 0 0 0 OUTPUT NODEFVAL "tx_coreclock"
-// Retrieval info: CONNECT: tx_coreclock 0 0 0 0 @tx_coreclock 0 0 0 0
+// Retrieval info: USED_PORT: pll_areset 0 0 0 0 INPUT NODEFVAL "pll_areset"
+// Retrieval info: CONNECT: @pll_areset 0 0 0 0 pll_areset 0 0 0 0
 // Retrieval info: USED_PORT: tx_in 0 0 10 0 INPUT NODEFVAL "tx_in[9..0]"
 // Retrieval info: CONNECT: @tx_in 0 0 10 0 tx_in 0 0 10 0
 // Retrieval info: USED_PORT: tx_inclock 0 0 0 0 INPUT NODEFVAL "tx_inclock"

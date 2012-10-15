@@ -1,5 +1,20 @@
 /*
-Developed By Jeff Lieu (lieumychuong@gmail.com)
+Copyright � 2012 JeffLieu-lieumychuong@gmail.com
+
+	This file is part of SGMII-IP-Core.
+    SGMII-IP-Core is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    SGMII-IP-Core is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with SGMII-IP-Core.  If not, see <http://www.gnu.org/licenses/>.
+
 File		:
 Description	:
 	This core implements:
@@ -110,6 +125,10 @@ module mSGMII
 	wire	[20:00] w21_LinkTimer;
 	wire 	w_TxEN,w_TxER,w_RxER, w_RxDV;
 	wire	[07:00] w8_RxD, w8_TxD;
+	wire 	w_BitSlip;
+	wire 	w_Invalid;//Not Used
+	wire 	w_TxEven;//Not Used
+	wire 	w_CurrentParity;
 	
 	//MII Clock Gen
 	reg [6:0] 	r7_Cntr;
@@ -146,7 +165,7 @@ module mSGMII
 	generate
 		genvar STAGE;
 		for(STAGE=0;STAGE<3;STAGE=STAGE+1)
-		begin
+		begin:PreCheck
 			assign w3_PreCheckIsComma[STAGE] 	= (r_RxCgInvalid[STAGE]==1'b0 && r_RxCgCtrl[STAGE]==1'b1 && r8_RxCodeGroup[STAGE]==`K28_5)?1'b1:1'b0;			
 			assign w3_PreCheckIsTSet[STAGE] 	= (r_RxCgInvalid[STAGE]==1'b0 && r_RxCgCtrl[STAGE]==1'b1 && r8_RxCodeGroup[STAGE]==`K29_7)?1'b1:1'b0;
 			assign w3_PreCheckIsRSet[STAGE] 	= (r_RxCgInvalid[STAGE]==1'b0 && r_RxCgCtrl[STAGE]==1'b1 && r8_RxCodeGroup[STAGE]==`K23_7)?1'b1:1'b0;
@@ -193,7 +212,7 @@ module mSGMII
 	.i32_WrData		(i32_WrData),
 	.o32_RdData		(o32_RdData),
 	.o_Ack			(o_Ack),
-	.o_Stall		(o_Stall),
+	.o_Stall		(),
 	
 	.io_Mdio		(io_Mdio),
 	.i_Mdc			(i_Mdc),
@@ -298,7 +317,7 @@ module mSGMII
 	.o_RxDV				(w_RxDV	),
 	.o_RxER				(w_RxER	),
 	.o8_RxD				(w8_RxD	),
-	.o_Invalid			(o_Invalid),
+	.o_Invalid			(w_Invalid),
 	.o_Receiving		(w_Receiving),
 	.i_Clk				(w_ClkSys),
 	.i_ARst_L			(w_ARstLogic_L));
@@ -372,7 +391,7 @@ module mSGMII
 	.i_RefClk125M		(i_RefClk125M		),
 	.o_CoreClk			(w_ClkSys			),
 	.i_GxBPwrDwn		(w_GxBPowerDown		),
-	.i_XcverDigitalRst	(~w_ARstLogic_L		),	
+	.i_XcverDigitalRst	(~i_ARstHardware_L	),	
 	.o_PllLocked		(w_PllLocked		),
 	.i_RxBitSlip		(w_BitSlip			),
 	
@@ -384,7 +403,7 @@ module mSGMII
 	.i8_TxCodeGroup		(w8_TxCode			),
 	.i_TxCodeValid		(w_TxCodeValid		),
 	.i_TxCodeCtrl		(w_TxCodeCtrl		),
-	.i_TxForceNegDisp	(w_TxForceNegDisp	),
+	.i_TxForceNegDisp	(1'b0	),
 	.o_RunningDisparity	(w_CurrentParity));
 	
 	assign o_GMIIClk = w_ClkSys;
