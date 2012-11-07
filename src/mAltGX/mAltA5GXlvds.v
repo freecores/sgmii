@@ -27,48 +27,20 @@ module mAltA5GXlvds (
 	wire [9:0] 	w10_txdatalocal;
 	wire [9:0] 	w10_rxdatalocal;
 	wire w_RxKErr,w_RxRdErr;
-	wire w_TxClk;
+	wire w_TxClk,w_RxClk;
+	wire w_BitSlip;
 	
-	/*mAlt8b10benc u8b10bEnc(
-	.clk			(o_CoreClk),
-	.reset_n		(~i_XcverDigitalRst),
-	.idle_ins		(~i_TxCodeValid),
-	.kin			(i_TxCodeCtrl),
-	.ena			(1'b1),
-	.datain			(i8_TxCodeGroup),
-	.rdin			(1'b0),
-	.rdforce		(i_TxForceNegDisp),
-	.kerr			(),
-	.dataout		(w10_txdatalocal),
-	.valid			(),
-	.rdout			(o_RunningDisparity),
-	.rdcascade		());*/
+	
 	mEnc8b10bMem u8b10bEnc(
 	.i8_Din				(i8_TxCodeGroup),		//HGFEDCBA
 	.i_Kin				(i_TxCodeCtrl),
 	.i_ForceDisparity	(i_TxForceNegDisp),
-	.i_Disparity		(~i_TxForceNegDisp),		//1 Is negative, 0 is positive	
-	.o10_Dout			(w10_txdata),	//abcdeifghj
+	.i_Disparity		(~i_TxForceNegDisp),	//1 is positive, 0 is negative
+	.o10_Dout			(w10_txdata),			//abcdeifghj
 	.o_Rd				(o_RunningDisparity),
 	.o_KErr				(),
-	.i_Clk				(o_CoreClk),
-	.i_ARst_L			(~i_XcverDigitalRst));
-	
-	/*mAlt8b10bdec 	u8b10bDec(	
-	.clk			(o_CoreClk),
-	.reset_n		(~i_XcverDigitalRst),
-	.idle_del		(),
-	.ena			(1'b1),
-	.datain			(w10_rxdatalocal),
-	.rdforce		(1'b0),
-	.rdin			(1'b0),
-	.valid			(w_RxDataValid),
-	.dataout		(o8_RxCodeGroup),
-	.kout			(o_RxCodeCtrl),
-	.kerr			(w_RxKErr),
-	.rdcascade		(),
-	.rdout			(),
-	.rderr			(w_RxRdErr));*/
+	.i_Clk				(w_RxClk),
+	.i_ARst_L			(~i_XcverDigitalRst));	
 	
 	mDec8b10bMem u8b10bDec(
 	.o8_Dout			(o8_RxCodeGroup),		//HGFEDCBA
@@ -78,51 +50,66 @@ module mAltA5GXlvds (
 	.o_DpErr			(w_RxRdErr),
 	.i_ForceDisparity 	(1'b0),
 	.i_Disparity		(1'b0),		
-	.i10_Din			(w10_rxdata),	//abcdeifghj
+	.i10_Din			(w10_rxdata),			//abcdeifghj
 	.o_Rd				(),	
-	.i_Clk				(o_CoreClk),
+	.i_Clk				(w_RxClk),
 	.i_ARst_L			(~i_XcverDigitalRst));
 	
 	assign o_RxCodeInvalid = w_RxKErr|w_RxRdErr;
 	assign o_SignalDetect = (~o_RxCodeInvalid)|o_RxCodeCtrl;
 	
 	mAltArriaVlvdsRx ulvdsrx (
-	.rx_channel_data_align (i_RxBitSlip),
-	.rx_in			(i_SerRx),
-	.rx_inclock		(i_RefClk125M),
-	.rx_out			(w10_rxdata),
-	.rx_locked		(o_PllLocked),
-	//.rx_outclock	(o_CoreClk),
-	.rx_divfwdclk	(o_CoreClk),
-	.pll_areset		(i_XcverDigitalRst));
+	.rx_cda_reset			(w_RxCdaReset),
+	.rx_channel_data_align 	(i_RxBitSlip),
+	.rx_in					(i_SerRx),
+	.rx_inclock				(i_RefClk125M),
+	.rx_out					(w10_rxdata),
+	.rx_locked				(o_PllLocked),
+	.rx_reset				(w_RxReset),
+	.rx_divfwdclk			(w_RxClk));
 	
-	mAltArriaVlvdsTx ulvdstx(
-	.tx_in			(w10_txdata),
-	.tx_inclock		(o_CoreClk),	
-	//.tx_coreclock	(w_TxClk),
-	.tx_out			(o_SerTx),
-	.pll_areset(i_XcverDigitalRst));
-	
-	
-	function [9:0] bitreverse ;
-		input [9:0] in;
-		integer I;
-		begin
-			for(I=0;I<10;I=I+1)
-				bitreverse[I]=in[9-I];		
+	/////////////////////////////////////////////////
+	//Hold In Reset Until Stable
+	/////////////////////////////////////////////////
+	reg [11:0] r12_LockCnt;
+	always@(posedge i_RefClk125M or negedge o_PllLocked)
+		if((~o_PllLocked))
+			r12_LockCnt<=12'h0;
+		else begin
+			if(~(&r12_LockCnt))
+				r12_LockCnt<=r12_LockCnt+12'h1;
 		end
-	endfunction
+			
+	assign w_RxReset 	= ~r12_LockCnt[11];
+	assign w_RxCdaReset = (r12_LockCnt[11:10]==2'b11)?1'b0:1'b1;
 	
-	//assign w10_txdata = bitreverse(w10_txdatalocal);
-	//assign w10_rxdatalocal = bitreverse(w10_rxdata);
-	// mAltRateAdapter uRxAdapter(
-	// .data	(w10_txdatalocal),
-	// .rdclk	(w_TxClk),
-	// .rdempty(rdempty),
-	// .rdreq	(~rdempty),
-	// .wrclk	(o_CoreClk),
-	// .wrreq	(1'b1),
-	// .q(w10_txdata));
-
+	reg [9:0] r10_txdata;
+	mAltArriaVlvdsTx ulvdstx(
+	.tx_in			(r10_txdata),
+	.tx_inclock		(w_TxSerClk),		
+	.tx_enable		(w_TxEnClk),		
+	.tx_out			(o_SerTx));
+	
+	mAltLvdsPll uAltTxPll(
+		.refclk		(w_RxClk),   	// refclk.clk
+		.rst		(w_PorRst),     // reset.reset
+		.outclk_0	(w_TxSerClk),	// outclk0.clk
+		.outclk_1	(w_TxEnClk), 	// outclk1.clk
+		.outclk_2	(w_TxClk), 		// outclk2.clk
+		.locked    	(w_TxLocked)	// locked.export
+	);
+	
+	always@(posedge w_TxClk)
+		r10_txdata <= w10_txdata;
+	
+	assign o_CoreClk = w_RxClk;
+	
+	reg [7:0] r8_PorTmr;	
+	assign w_PorRst = ~(&r8_PorTmr);
+	always@(posedge i_RefClk125M)
+	begin 
+		if(w_PorRst)
+			r8_PorTmr <= r8_PorTmr+8'h1;
+	end	
 
 endmodule 

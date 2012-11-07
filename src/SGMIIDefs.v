@@ -1,5 +1,5 @@
 /*
-	Copyright © 2012 JeffLieu-lieumychuong@gmail.com
+	Copyright ï¿½ 2012 JeffLieu-lieumychuong@gmail.com
 	
 	This file is part of SGMII-IP-Core.
     SGMII-IP-Core is free software: you can redistribute it and/or modify
@@ -45,8 +45,8 @@ Revision	:
 `define K30_7	8'hFE	//V/
 
 `define cReg4Default 	16'h0000
-`define cReg0Default	16'h0000
-`define cRegXDefault	16'h0000
+`define cReg0Default	16'h1000
+`define cRegXDefault	16'h0003
 `define cRegLinkTimerDefault	(10_000_000/8)
 
 `define cLcAbility_FD	16'h0020	

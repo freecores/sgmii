@@ -1,5 +1,5 @@
 /*
-Copyright � 2012 JeffLieu-lieumychuong@gmail.com
+Copyright � 2012 JeffLieu-jefflieu@fpga-ipcores.com
 
 	This file is part of SGMII-IP-Core.
     SGMII-IP-Core is free software: you can redistribute it and/or modify
@@ -361,14 +361,14 @@ module mSGMII
 	
 	assign w_SignalDetect=~w_RxCodeInvalid;
 	
-	/*mXcver u0Xcver(
+	/*mXcver #(.pXcverName("AltArriaV"))u0Xcver(
 
 	.i_SerRx			(i_SerRx			),
 	.o_SerTx			(o_SerTx			),
 		
 	.i_RefClk125M		(i_RefClk125M		),
 	.o_TxClk			(w_ClkSys			),
-	.i_CalClk			(i_CalClk			),
+	.i_CalClk			(i_RefClk125M		),
 	.i_GxBPwrDwn		(w_GxBPowerDown		),
 	.i_XcverDigitalRst	(~w_ARstLogic_L		),	
 	.o_PllLocked		(w_PllLocked		),
