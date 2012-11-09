@@ -72,7 +72,7 @@ module mAltA5GXlvds (
 	//Hold In Reset Until Stable
 	/////////////////////////////////////////////////
 	reg [11:0] r12_LockCnt;
-	always@(posedge i_RefClk125M or negedge o_PllLocked)
+	always@(posedge w_RxClk or negedge o_PllLocked)
 		if((~o_PllLocked))
 			r12_LockCnt<=12'h0;
 		else begin
