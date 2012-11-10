@@ -7,8 +7,8 @@
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/RTL/Top_level_modules/altera_tse_multi_mac_pcs_pma.v,v $
 //
 // $Revision: #1 $
-// $Date: 2011/11/10 $
-// Check in by : $Author: max $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : Arul Paniandi
 //
 // Project     : Triple Speed Ethernet - 10/100/1000 MAC
@@ -1320,6 +1320,33 @@ wire    tbi_tx_clk_20;
 wire    tbi_tx_clk_21;
 wire    tbi_tx_clk_22;
 wire    tbi_tx_clk_23;
+
+wire    reset_ref_clk_int;
+
+wire    reset_tbi_rx_clk_0_int;
+wire    reset_tbi_rx_clk_1_int;
+wire    reset_tbi_rx_clk_2_int;
+wire    reset_tbi_rx_clk_3_int;
+wire    reset_tbi_rx_clk_4_int;
+wire    reset_tbi_rx_clk_5_int;
+wire    reset_tbi_rx_clk_6_int;
+wire    reset_tbi_rx_clk_7_int;
+wire    reset_tbi_rx_clk_8_int;
+wire    reset_tbi_rx_clk_9_int;
+wire    reset_tbi_rx_clk_10_int;
+wire    reset_tbi_rx_clk_11_int;
+wire    reset_tbi_rx_clk_12_int;
+wire    reset_tbi_rx_clk_13_int;
+wire    reset_tbi_rx_clk_14_int;
+wire    reset_tbi_rx_clk_15_int;
+wire    reset_tbi_rx_clk_16_int;
+wire    reset_tbi_rx_clk_17_int;
+wire    reset_tbi_rx_clk_18_int;
+wire    reset_tbi_rx_clk_19_int;
+wire    reset_tbi_rx_clk_20_int;
+wire    reset_tbi_rx_clk_21_int;
+wire    reset_tbi_rx_clk_22_int;
+wire    reset_tbi_rx_clk_23_int;
 
 wire pll_areset_0,rx_cda_reset_0,rx_channel_data_align_0,rx_locked_0,rx_reset_0;
 wire pll_areset_1,rx_cda_reset_1,rx_channel_data_align_1,rx_locked_1,rx_reset_1;

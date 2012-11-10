@@ -7,9 +7,9 @@
 // $RCSfile: altera_tse_multi_mac_pcs_pma_gige.v,v $
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/RTL/Top_level_modules/altera_tse_multi_mac_pcs_pma_gige_phyip.v,v $
 //
-// $Revision: #2 $
-// $Date: 2011/01/31 $
-// Check in by : $Author: wyleong $
+// $Revision: #5 $
+// $Date: 2012/01/30 $
+// Check in by : $Author: hschmit $
 // Author      : Arul Paniandi
 //
 // Project     : Triple Speed Ethernet - 10/100/1000 MAC
@@ -73,6 +73,11 @@ parameter DEVICE_FAMILY         = "ARRIAGX",            //  The device family th
 parameter TRANSCEIVER_OPTION    = 1'b0,                 //  Option to select transceiver block for MAC PCS PMA Instantiation. Valid Values are 0 and 1:  0 - GXB (GIGE Mode) 1 - LVDS IO
 parameter ENABLE_ALT_RECONFIG   = 0,                    //  Option to expose the altreconfig ports
 parameter SYNCHRONIZER_DEPTH 	= 3,	  	        //  Number of synchronizer
+
+//IEEE1588 code
+parameter TSTAMP_FP_WIDTH                 = 4,		//	Finger print width associated to the timestamp request
+parameter ENABLE_TIMESTAMPING               = 0,		// 	To enable time stamping logic
+parameter ENABLE_PTP_1STEP               	= 0,		// 	To enable time 1 step clock PTP
 // Internal parameters
 parameter STARTING_CHANNEL_NUMBER = 0,
 parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
@@ -107,6 +112,7 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
 	// SHARED CLK SIGNALS
     output wire  mac_rx_clk,                 //  Av-ST Receive Clock
     output wire  mac_tx_clk,                 //  Av-ST Transmit Clock 
+    input  wire  pcs_phase_measure_clk,      //  Phase Measurement Clock
 
 	// SHARED RX STATUS
     input wire   rx_afull_clk,                             //  Almost full clk
@@ -164,6 +170,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_0,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_0,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_0, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_0, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_0, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_0, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_0, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_0, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_0, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_0, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_0, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_0, 						//	Time of Day
+
 
     // CHANNEL 1
 
@@ -213,6 +231,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_1,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_1,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_1,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_1, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_1, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_1, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_1, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_1, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_1, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_1, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_1, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_1, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_1, 						//	Time of Day
 
 
     // CHANNEL 2
@@ -264,6 +294,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_2,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_2,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_2, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_2, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_2, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_2, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_2, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_2, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_2, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_2, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_2, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_2, 						//	Time of Day
+
 
     // CHANNEL 3
 
@@ -313,6 +355,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_3,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_3,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_3,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_3, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_3, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_3, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_3, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_3, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_3, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_3, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_3, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_3, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_3, 						//	Time of Day
 
 
     // CHANNEL 4
@@ -364,6 +418,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_4,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_4,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_4, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_4, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_4, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_4, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_4, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_4, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_4, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_4, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_4, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_4, 						//	Time of Day
+
 
     // CHANNEL 5
 
@@ -413,6 +479,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_5,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_5,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_5,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_5, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_5, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_5, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_5, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_5, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_5, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_5, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_5, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_5, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_5, 						//	Time of Day
 
 
     // CHANNEL 6
@@ -464,6 +542,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_6,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_6,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_6, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_6, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_6, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_6, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_6, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_6, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_6, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_6, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_6, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_6, 						//	Time of Day
+
 
     // CHANNEL 7
 
@@ -513,6 +603,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_7,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_7,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_7,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_7, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_7, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_7, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_7, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_7, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_7, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_7, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_7, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_7, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_7, 						//	Time of Day
 
 
     // CHANNEL 8
@@ -564,6 +666,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_8,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_8,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_8, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_8, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_8, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_8, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_8, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_8, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_8, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_8, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_8, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_8, 						//	Time of Day
+
 
     // CHANNEL 9
 
@@ -613,6 +727,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_9,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_9,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_9,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_9, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_9, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_9, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_9, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_9, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_9, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_9, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_9, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_9, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_9, 						//	Time of Day
 
 
     // CHANNEL 10
@@ -664,6 +790,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_10,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_10,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_10, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_10, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_10, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_10, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_10, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_10, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_10, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_10, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_10, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_10, 						//	Time of Day
+
 
     // CHANNEL 11
 
@@ -713,6 +851,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_11,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_11,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_11,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_11, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_11, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_11, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_11, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_11, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_11, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_11, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_11, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_11, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_11, 						//	Time of Day
 
 
     // CHANNEL 12
@@ -764,6 +914,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_12,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_12,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_12, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_12, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_12, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_12, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_12, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_12, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_12, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_12, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_12, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_12, 						//	Time of Day
+
 
     // CHANNEL 13
 
@@ -813,6 +975,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_13,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_13,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_13,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_13, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_13, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_13, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_13, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_13, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_13, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_13, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_13, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_13, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_13, 						//	Time of Day
 
 
     // CHANNEL 14
@@ -864,6 +1038,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_14,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_14,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_14, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_14, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_14, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_14, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_14, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_14, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_14, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_14, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_14, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_14, 						//	Time of Day
+
 
     // CHANNEL 15
 
@@ -913,6 +1099,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_15,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_15,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_15,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_15, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_15, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_15, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_15, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_15, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_15, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_15, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_15, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_15, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_15, 						//	Time of Day
 
 
     // CHANNEL 16
@@ -964,6 +1162,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_16,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_16,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_16, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_16, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_16, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_16, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_16, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_16, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_16, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_16, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_16, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_16, 						//	Time of Day
+
 
     // CHANNEL 17
 
@@ -1013,6 +1223,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_17,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_17,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_17,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_17, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_17, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_17, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_17, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_17, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_17, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_17, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_17, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_17, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_17, 						//	Time of Day
 
 
     // CHANNEL 18
@@ -1064,6 +1286,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_18,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_18,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_18, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_18, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_18, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_18, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_18, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_18, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_18, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_18, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_18, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_18, 						//	Time of Day
+
 
     // CHANNEL 19
 
@@ -1113,6 +1347,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_19,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_19,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_19,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_19, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_19, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_19, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_19, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_19, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_19, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_19, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_19, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_19, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_19, 						//	Time of Day
 
 
     // CHANNEL 20
@@ -1164,6 +1410,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_20,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_20,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_20, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_20, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_20, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_20, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_20, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_20, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_20, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_20, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_20, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_20, 						//	Time of Day
+
 
     // CHANNEL 21
 
@@ -1213,6 +1471,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire  phy_mgmt_waitrequest_21,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_21,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_21,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_21, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_21, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_21, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_21, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_21, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_21, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_21, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_21, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_21, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_21, 						//	Time of Day
 
 
     // CHANNEL 22
@@ -1264,6 +1534,18 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     input wire  phy_mgmt_write_22,          //  write to PHYIP management interface 
     input wire  [31:0]phy_mgmt_writedata_22,//  writedata to PHYIP management interface 
 
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_22, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_22, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_22, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_22, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_22, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_22, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_22, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_22, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_22, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_22, 						//	Time of Day
+
 
     // CHANNEL 23
 
@@ -1312,7 +1594,19 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
     output wire [31:0]phy_mgmt_readdata_23, //  readdata from PHYIP management interface 
     output wire  phy_mgmt_waitrequest_23,    //  waitrequest from PHYIP management interface 
     input wire  phy_mgmt_write_23,          //  write to PHYIP management interface 
-    input wire  [31:0]phy_mgmt_writedata_23);//  writedata to PHYIP management interface 
+    input wire  [31:0]phy_mgmt_writedata_23,//  writedata to PHYIP management interface 
+
+    //IEEE1588's code
+    input	wire                                              			tx_egress_timestamp_request_valid_23, 		//	Timestamp request valid from user
+    input	wire       [(TSTAMP_FP_WIDTH)-1:0]              			tx_egress_timestamp_request_data_23, 		//	Fingerprint associated to the timestamp request
+    output	wire                                              			tx_egress_timestamp_valid_23, 				//	Timestamp + fingerprint from TSU
+    output 	wire      [(96 + TSTAMP_FP_WIDTH)-1:0] 		tx_egress_timestamp_data_23, 				//	Timestamp + fingerprint from TSU
+    input 	wire      [96-1:0]                  			tx_time_of_day_data_23, 						//	Time of Day
+    input	wire                                                  		tx_ingress_timestamp_valid_23, 				//	Timestamp to TSU
+    input	wire      [(96)-1:0]     						tx_ingress_timestamp_data_23, 	    		//	Timestamp to TSU
+    output	wire													 	rx_ingress_timestamp_valid_23, 				// 	RX timestamp valid
+    output	wire      [(96)-1:0]							rx_ingress_timestamp_data_23, 				// 	RX timestamp data
+    input	wire      [96-1:0]                  			rx_time_of_day_data_23); 						//	Time of Day
 
 
 wire    MAC_PCS_reset;
@@ -1628,6 +1922,18 @@ wire    reset_rx_pcs_clk_c23_int;
     assign led_link_22 = link_status[22];
     assign led_char_err_23 = led_char_err_gx[23];
     assign led_link_23 = link_status[23];
+   wire pcs_phase_measure_clk_w;
+
+   generate 
+      if (ENABLE_TIMESTAMPING == 0)
+        begin
+           assign pcs_phase_measure_clk_w = 1'b0;
+        end
+      else 
+        begin
+           assign pcs_phase_measure_clk_w = pcs_phase_measure_clk;
+        end
+   endgenerate
 
 
     // Instantiation of the MAC_PCS core that connects to a PMA
@@ -1650,10 +1956,11 @@ wire    reset_rx_pcs_clk_c23_int;
         .mdio_oen(mdio_oen),                      //OUTPUT : MDIO Output Enable
         .mac_rx_clk(mac_rx_clk),                  //OUTPUT : Av-ST Rx Clock
         .mac_tx_clk(mac_tx_clk),                  //OUTPUT : Av-ST Tx Clock
-	    .rx_afull_clk(rx_afull_clk),              //INPUT  : AFull Status Clock
-	    .rx_afull_data(rx_afull_data),            //INPUT  : AFull Status Data
-	    .rx_afull_valid(rx_afull_valid),          //INPUT  : AFull Status Valid
-	    .rx_afull_channel(rx_afull_channel),      //INPUT  : AFull Status Channel
+	.rx_afull_clk(rx_afull_clk),              //INPUT  : AFull Status Clock
+	.rx_afull_data(rx_afull_data),            //INPUT  : AFull Status Data
+	.rx_afull_valid(rx_afull_valid),          //INPUT  : AFull Status Valid
+	.rx_afull_channel(rx_afull_channel),      //INPUT  : AFull Status Channel
+	.pcs_phase_measure_clk(pcs_phase_measure_clk_w),
 
          // Channel 0 
             
@@ -1698,6 +2005,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_0(magic_sleep_n_0),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_0(magic_wakeup_0),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_0(tx_egress_timestamp_request_valid_0),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_0(tx_egress_timestamp_request_data_0),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_0(tx_egress_timestamp_valid_0),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_0(tx_egress_timestamp_data_0),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_0(tx_time_of_day_data_0),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_0(tx_ingress_timestamp_valid_0),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_0(tx_ingress_timestamp_data_0),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_0(rx_ingress_timestamp_valid_0),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_0(rx_ingress_timestamp_data_0),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_0(rx_time_of_day_data_0),								//INPUT:	Time of Day
+
          // Channel 1 
             
 
@@ -1740,6 +2059,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_1(xon_gen_1),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_1(magic_sleep_n_1),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_1(magic_wakeup_1),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_1(tx_egress_timestamp_request_valid_1),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_1(tx_egress_timestamp_request_data_1),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_1(tx_egress_timestamp_valid_1),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_1(tx_egress_timestamp_data_1),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_1(tx_time_of_day_data_1),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_1(tx_ingress_timestamp_valid_1),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_1(tx_ingress_timestamp_data_1),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_1(rx_ingress_timestamp_valid_1),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_1(rx_ingress_timestamp_data_1),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_1(rx_time_of_day_data_1),								//INPUT:	Time of Day
 
          // Channel 2 
             
@@ -1784,6 +2115,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_2(magic_sleep_n_2),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_2(magic_wakeup_2),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_2(tx_egress_timestamp_request_valid_2),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_2(tx_egress_timestamp_request_data_2),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_2(tx_egress_timestamp_valid_2),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_2(tx_egress_timestamp_data_2),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_2(tx_time_of_day_data_2),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_2(tx_ingress_timestamp_valid_2),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_2(tx_ingress_timestamp_data_2),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_2(rx_ingress_timestamp_valid_2),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_2(rx_ingress_timestamp_data_2),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_2(rx_time_of_day_data_2),								//INPUT:	Time of Day
+
          // Channel 3 
             
 
@@ -1826,6 +2169,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_3(xon_gen_3),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_3(magic_sleep_n_3),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_3(magic_wakeup_3),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_3(tx_egress_timestamp_request_valid_3),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_3(tx_egress_timestamp_request_data_3),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_3(tx_egress_timestamp_valid_3),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_3(tx_egress_timestamp_data_3),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_3(tx_time_of_day_data_3),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_3(tx_ingress_timestamp_valid_3),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_3(tx_ingress_timestamp_data_3),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_3(rx_ingress_timestamp_valid_3),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_3(rx_ingress_timestamp_data_3),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_3(rx_time_of_day_data_3),								//INPUT:	Time of Day
 
          // Channel 4 
             
@@ -1870,6 +2225,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_4(magic_sleep_n_4),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_4(magic_wakeup_4),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_4(tx_egress_timestamp_request_valid_4),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_4(tx_egress_timestamp_request_data_4),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_4(tx_egress_timestamp_valid_4),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_4(tx_egress_timestamp_data_4),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_4(tx_time_of_day_data_4),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_4(tx_ingress_timestamp_valid_4),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_4(tx_ingress_timestamp_data_4),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_4(rx_ingress_timestamp_valid_4),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_4(rx_ingress_timestamp_data_4),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_4(rx_time_of_day_data_4),								//INPUT:	Time of Day
+
          // Channel 5 
             
 
@@ -1912,6 +2279,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_5(xon_gen_5),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_5(magic_sleep_n_5),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_5(magic_wakeup_5),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_5(tx_egress_timestamp_request_valid_5),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_5(tx_egress_timestamp_request_data_5),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_5(tx_egress_timestamp_valid_5),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_5(tx_egress_timestamp_data_5),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_5(tx_time_of_day_data_5),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_5(tx_ingress_timestamp_valid_5),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_5(tx_ingress_timestamp_data_5),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_5(rx_ingress_timestamp_valid_5),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_5(rx_ingress_timestamp_data_5),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_5(rx_time_of_day_data_5),								//INPUT:	Time of Day
 
          // Channel 6 
             
@@ -1956,6 +2335,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_6(magic_sleep_n_6),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_6(magic_wakeup_6),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_6(tx_egress_timestamp_request_valid_6),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_6(tx_egress_timestamp_request_data_6),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_6(tx_egress_timestamp_valid_6),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_6(tx_egress_timestamp_data_6),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_6(tx_time_of_day_data_6),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_6(tx_ingress_timestamp_valid_6),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_6(tx_ingress_timestamp_data_6),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_6(rx_ingress_timestamp_valid_6),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_6(rx_ingress_timestamp_data_6),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_6(rx_time_of_day_data_6),								//INPUT:	Time of Day
+
          // Channel 7 
             
 
@@ -1998,6 +2389,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_7(xon_gen_7),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_7(magic_sleep_n_7),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_7(magic_wakeup_7),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_7(tx_egress_timestamp_request_valid_7),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_7(tx_egress_timestamp_request_data_7),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_7(tx_egress_timestamp_valid_7),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_7(tx_egress_timestamp_data_7),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_7(tx_time_of_day_data_7),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_7(tx_ingress_timestamp_valid_7),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_7(tx_ingress_timestamp_data_7),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_7(rx_ingress_timestamp_valid_7),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_7(rx_ingress_timestamp_data_7),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_7(rx_time_of_day_data_7),								//INPUT:	Time of Day
 
          // Channel 8 
             
@@ -2042,6 +2445,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_8(magic_sleep_n_8),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_8(magic_wakeup_8),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_8(tx_egress_timestamp_request_valid_8),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_8(tx_egress_timestamp_request_data_8),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_8(tx_egress_timestamp_valid_8),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_8(tx_egress_timestamp_data_8),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_8(tx_time_of_day_data_8),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_8(tx_ingress_timestamp_valid_8),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_8(tx_ingress_timestamp_data_8),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_8(rx_ingress_timestamp_valid_8),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_8(rx_ingress_timestamp_data_8),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_8(rx_time_of_day_data_8),								//INPUT:	Time of Day
+
          // Channel 9 
             
 
@@ -2084,6 +2499,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_9(xon_gen_9),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_9(magic_sleep_n_9),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_9(magic_wakeup_9),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_9(tx_egress_timestamp_request_valid_9),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_9(tx_egress_timestamp_request_data_9),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_9(tx_egress_timestamp_valid_9),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_9(tx_egress_timestamp_data_9),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_9(tx_time_of_day_data_9),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_9(tx_ingress_timestamp_valid_9),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_9(tx_ingress_timestamp_data_9),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_9(rx_ingress_timestamp_valid_9),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_9(rx_ingress_timestamp_data_9),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_9(rx_time_of_day_data_9),								//INPUT:	Time of Day
 
          // Channel 10 
             
@@ -2128,6 +2555,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_10(magic_sleep_n_10),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_10(magic_wakeup_10),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_10(tx_egress_timestamp_request_valid_10),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_10(tx_egress_timestamp_request_data_10),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_10(tx_egress_timestamp_valid_10),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_10(tx_egress_timestamp_data_10),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_10(tx_time_of_day_data_10),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_10(tx_ingress_timestamp_valid_10),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_10(tx_ingress_timestamp_data_10),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_10(rx_ingress_timestamp_valid_10),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_10(rx_ingress_timestamp_data_10),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_10(rx_time_of_day_data_10),								//INPUT:	Time of Day
+
          // Channel 11 
             
 
@@ -2170,6 +2609,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_11(xon_gen_11),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_11(magic_sleep_n_11),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_11(magic_wakeup_11),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_11(tx_egress_timestamp_request_valid_11),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_11(tx_egress_timestamp_request_data_11),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_11(tx_egress_timestamp_valid_11),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_11(tx_egress_timestamp_data_11),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_11(tx_time_of_day_data_11),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_11(tx_ingress_timestamp_valid_11),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_11(tx_ingress_timestamp_data_11),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_11(rx_ingress_timestamp_valid_11),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_11(rx_ingress_timestamp_data_11),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_11(rx_time_of_day_data_11),								//INPUT:	Time of Day
 
          // Channel 12 
             
@@ -2214,6 +2665,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_12(magic_sleep_n_12),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_12(magic_wakeup_12),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_12(tx_egress_timestamp_request_valid_12),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_12(tx_egress_timestamp_request_data_12),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_12(tx_egress_timestamp_valid_12),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_12(tx_egress_timestamp_data_12),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_12(tx_time_of_day_data_12),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_12(tx_ingress_timestamp_valid_12),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_12(tx_ingress_timestamp_data_12),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_12(rx_ingress_timestamp_valid_12),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_12(rx_ingress_timestamp_data_12),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_12(rx_time_of_day_data_12),								//INPUT:	Time of Day
+
          // Channel 13 
             
 
@@ -2256,6 +2719,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_13(xon_gen_13),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_13(magic_sleep_n_13),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_13(magic_wakeup_13),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_13(tx_egress_timestamp_request_valid_13),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_13(tx_egress_timestamp_request_data_13),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_13(tx_egress_timestamp_valid_13),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_13(tx_egress_timestamp_data_13),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_13(tx_time_of_day_data_13),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_13(tx_ingress_timestamp_valid_13),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_13(tx_ingress_timestamp_data_13),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_13(rx_ingress_timestamp_valid_13),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_13(rx_ingress_timestamp_data_13),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_13(rx_time_of_day_data_13),								//INPUT:	Time of Day
 
          // Channel 14 
             
@@ -2300,6 +2775,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_14(magic_sleep_n_14),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_14(magic_wakeup_14),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_14(tx_egress_timestamp_request_valid_14),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_14(tx_egress_timestamp_request_data_14),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_14(tx_egress_timestamp_valid_14),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_14(tx_egress_timestamp_data_14),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_14(tx_time_of_day_data_14),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_14(tx_ingress_timestamp_valid_14),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_14(tx_ingress_timestamp_data_14),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_14(rx_ingress_timestamp_valid_14),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_14(rx_ingress_timestamp_data_14),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_14(rx_time_of_day_data_14),								//INPUT:	Time of Day
+
          // Channel 15 
             
 
@@ -2342,6 +2829,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_15(xon_gen_15),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_15(magic_sleep_n_15),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_15(magic_wakeup_15),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_15(tx_egress_timestamp_request_valid_15),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_15(tx_egress_timestamp_request_data_15),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_15(tx_egress_timestamp_valid_15),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_15(tx_egress_timestamp_data_15),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_15(tx_time_of_day_data_15),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_15(tx_ingress_timestamp_valid_15),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_15(tx_ingress_timestamp_data_15),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_15(rx_ingress_timestamp_valid_15),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_15(rx_ingress_timestamp_data_15),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_15(rx_time_of_day_data_15),								//INPUT:	Time of Day
 
          // Channel 16 
             
@@ -2386,6 +2885,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_16(magic_sleep_n_16),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_16(magic_wakeup_16),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_16(tx_egress_timestamp_request_valid_16),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_16(tx_egress_timestamp_request_data_16),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_16(tx_egress_timestamp_valid_16),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_16(tx_egress_timestamp_data_16),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_16(tx_time_of_day_data_16),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_16(tx_ingress_timestamp_valid_16),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_16(tx_ingress_timestamp_data_16),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_16(rx_ingress_timestamp_valid_16),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_16(rx_ingress_timestamp_data_16),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_16(rx_time_of_day_data_16),								//INPUT:	Time of Day
+
          // Channel 17 
             
 
@@ -2428,6 +2939,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_17(xon_gen_17),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_17(magic_sleep_n_17),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_17(magic_wakeup_17),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_17(tx_egress_timestamp_request_valid_17),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_17(tx_egress_timestamp_request_data_17),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_17(tx_egress_timestamp_valid_17),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_17(tx_egress_timestamp_data_17),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_17(tx_time_of_day_data_17),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_17(tx_ingress_timestamp_valid_17),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_17(tx_ingress_timestamp_data_17),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_17(rx_ingress_timestamp_valid_17),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_17(rx_ingress_timestamp_data_17),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_17(rx_time_of_day_data_17),								//INPUT:	Time of Day
 
          // Channel 18 
             
@@ -2472,6 +2995,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_18(magic_sleep_n_18),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_18(magic_wakeup_18),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_18(tx_egress_timestamp_request_valid_18),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_18(tx_egress_timestamp_request_data_18),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_18(tx_egress_timestamp_valid_18),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_18(tx_egress_timestamp_data_18),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_18(tx_time_of_day_data_18),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_18(tx_ingress_timestamp_valid_18),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_18(tx_ingress_timestamp_data_18),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_18(rx_ingress_timestamp_valid_18),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_18(rx_ingress_timestamp_data_18),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_18(rx_time_of_day_data_18),								//INPUT:	Time of Day
+
          // Channel 19 
             
 
@@ -2514,6 +3049,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_19(xon_gen_19),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_19(magic_sleep_n_19),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_19(magic_wakeup_19),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_19(tx_egress_timestamp_request_valid_19),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_19(tx_egress_timestamp_request_data_19),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_19(tx_egress_timestamp_valid_19),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_19(tx_egress_timestamp_data_19),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_19(tx_time_of_day_data_19),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_19(tx_ingress_timestamp_valid_19),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_19(tx_ingress_timestamp_data_19),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_19(rx_ingress_timestamp_valid_19),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_19(rx_ingress_timestamp_data_19),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_19(rx_time_of_day_data_19),								//INPUT:	Time of Day
 
          // Channel 20 
             
@@ -2558,6 +3105,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_20(magic_sleep_n_20),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_20(magic_wakeup_20),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_20(tx_egress_timestamp_request_valid_20),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_20(tx_egress_timestamp_request_data_20),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_20(tx_egress_timestamp_valid_20),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_20(tx_egress_timestamp_data_20),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_20(tx_time_of_day_data_20),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_20(tx_ingress_timestamp_valid_20),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_20(tx_ingress_timestamp_data_20),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_20(rx_ingress_timestamp_valid_20),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_20(rx_ingress_timestamp_data_20),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_20(rx_time_of_day_data_20),								//INPUT:	Time of Day
+
          // Channel 21 
             
 
@@ -2600,6 +3159,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .xon_gen_21(xon_gen_21),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_21(magic_sleep_n_21),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_21(magic_wakeup_21),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_21(tx_egress_timestamp_request_valid_21),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_21(tx_egress_timestamp_request_data_21),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_21(tx_egress_timestamp_valid_21),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_21(tx_egress_timestamp_data_21),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_21(tx_time_of_day_data_21),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_21(tx_ingress_timestamp_valid_21),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_21(tx_ingress_timestamp_data_21),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_21(rx_ingress_timestamp_valid_21),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_21(rx_ingress_timestamp_data_21),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_21(rx_time_of_day_data_21),								//INPUT:	Time of Day
 
          // Channel 22 
             
@@ -2644,6 +3215,18 @@ wire    reset_rx_pcs_clk_c23_int;
         .magic_sleep_n_22(magic_sleep_n_22),        //INPUT  : MAC SLEEP MODE CONTROL
         .magic_wakeup_22(magic_wakeup_22),          //OUTPUT : MAC WAKE-UP INDICATION
 
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_22(tx_egress_timestamp_request_valid_22),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_22(tx_egress_timestamp_request_data_22),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_22(tx_egress_timestamp_valid_22),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_22(tx_egress_timestamp_data_22),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_22(tx_time_of_day_data_22),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_22(tx_ingress_timestamp_valid_22),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_22(tx_ingress_timestamp_data_22),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_22(rx_ingress_timestamp_valid_22),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_22(rx_ingress_timestamp_data_22),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_22(rx_time_of_day_data_22),								//INPUT:	Time of Day
+
          // Channel 23 
             
 
@@ -2685,7 +3268,19 @@ wire    reset_rx_pcs_clk_c23_int;
         .xoff_gen_23(xoff_gen_23),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_23(xon_gen_23),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_23(magic_sleep_n_23),        //INPUT  : MAC SLEEP MODE CONTROL
-        .magic_wakeup_23(magic_wakeup_23));         //OUTPUT : MAC WAKE-UP INDICATION
+        .magic_wakeup_23(magic_wakeup_23),          //OUTPUT : MAC WAKE-UP INDICATION
+
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_23(tx_egress_timestamp_request_valid_23),	//INPUT:	Timestamp request valid from user
+        .tx_egress_timestamp_request_data_23(tx_egress_timestamp_request_data_23),		//INPUT:	Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_23(tx_egress_timestamp_valid_23),					//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_23(tx_egress_timestamp_data_23),						//OUTPUT:	Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_23(tx_time_of_day_data_23),								//INPUT:	Time of Day
+        .tx_ingress_timestamp_valid_23(tx_ingress_timestamp_valid_23),					//INPUT:	Timestamp to TSU
+        .tx_ingress_timestamp_data_23(tx_ingress_timestamp_data_23),					//INPUT:	Timestamp to TSU
+        .rx_ingress_timestamp_valid_23(rx_ingress_timestamp_valid_23),					//OUTPUT: 	RX timestamp valid
+        .rx_ingress_timestamp_data_23(rx_ingress_timestamp_data_23),					//OUTPUT: 	RX timestamp data
+        .rx_time_of_day_data_23(rx_time_of_day_data_23));								//INPUT:	Time of Day
 
     defparam
         U_MULTI_MAC_PCS.USE_SYNC_RESET = USE_SYNC_RESET, 
@@ -2723,7 +3318,10 @@ wire    reset_rx_pcs_clk_c23_int;
         U_MULTI_MAC_PCS.ENABLE_RX_FIFO_STATUS = ENABLE_RX_FIFO_STATUS,
         U_MULTI_MAC_PCS.ENABLE_EXTENDED_STAT_REG = ENABLE_EXTENDED_STAT_REG,
         U_MULTI_MAC_PCS.ENABLE_CLK_SHARING = ENABLE_CLK_SHARING,    
-        U_MULTI_MAC_PCS.ENABLE_REG_SHARING = ENABLE_REG_SHARING;    
+        U_MULTI_MAC_PCS.ENABLE_REG_SHARING = ENABLE_REG_SHARING,    
+        U_MULTI_MAC_PCS.TSTAMP_FP_WIDTH = TSTAMP_FP_WIDTH,
+        U_MULTI_MAC_PCS.ENABLE_TIMESTAMPING = ENABLE_TIMESTAMPING,
+        U_MULTI_MAC_PCS.ENABLE_PTP_1STEP = ENABLE_PTP_1STEP;
 
 
 
@@ -2773,7 +3371,8 @@ generate if (MAX_CHANNELS > 0)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[0])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_0.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_0.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_0.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -2814,6 +3413,7 @@ generate if (MAX_CHANNELS > 0)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_0.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_0.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_0.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_0.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -2877,7 +3477,8 @@ generate if (MAX_CHANNELS > 1)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[1])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_1.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_1.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_1.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -2918,6 +3519,7 @@ generate if (MAX_CHANNELS > 1)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_1.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_1.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_1.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_1.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -2981,7 +3583,8 @@ generate if (MAX_CHANNELS > 2)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[2])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_2.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_2.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_2.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3022,6 +3625,7 @@ generate if (MAX_CHANNELS > 2)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_2.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_2.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_2.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_2.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -3085,7 +3689,8 @@ generate if (MAX_CHANNELS > 3)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[3])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_3.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_3.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_3.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3126,6 +3731,7 @@ generate if (MAX_CHANNELS > 3)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_3.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_3.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_3.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_3.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -3189,7 +3795,8 @@ generate if (MAX_CHANNELS > 4)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[4])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_4.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_4.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_4.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3230,6 +3837,7 @@ generate if (MAX_CHANNELS > 4)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_4.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_4.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_4.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_4.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -3293,7 +3901,8 @@ generate if (MAX_CHANNELS > 5)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[5])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_5.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_5.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_5.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3334,6 +3943,7 @@ generate if (MAX_CHANNELS > 5)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_5.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_5.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_5.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_5.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -3397,7 +4007,8 @@ generate if (MAX_CHANNELS > 6)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[6])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_6.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_6.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_6.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3438,6 +4049,7 @@ generate if (MAX_CHANNELS > 6)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_6.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_6.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_6.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_6.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -3501,7 +4113,8 @@ generate if (MAX_CHANNELS > 7)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[7])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_7.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_7.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_7.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3542,6 +4155,7 @@ generate if (MAX_CHANNELS > 7)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_7.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_7.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_7.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_7.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -3605,7 +4219,8 @@ generate if (MAX_CHANNELS > 8)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[8])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_8.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_8.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_8.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3646,6 +4261,7 @@ generate if (MAX_CHANNELS > 8)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_8.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_8.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_8.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_8.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -3709,7 +4325,8 @@ generate if (MAX_CHANNELS > 9)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[9])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_9.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_9.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_9.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3750,6 +4367,7 @@ generate if (MAX_CHANNELS > 9)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_9.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_9.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_9.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_9.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -3813,7 +4431,8 @@ generate if (MAX_CHANNELS > 10)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[10])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_10.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_10.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_10.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3854,6 +4473,7 @@ generate if (MAX_CHANNELS > 10)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_10.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_10.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_10.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_10.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -3917,7 +4537,8 @@ generate if (MAX_CHANNELS > 11)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[11])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_11.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_11.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_11.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3958,6 +4579,7 @@ generate if (MAX_CHANNELS > 11)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_11.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_11.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_11.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_11.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4021,7 +4643,8 @@ generate if (MAX_CHANNELS > 12)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[12])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_12.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_12.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_12.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4062,6 +4685,7 @@ generate if (MAX_CHANNELS > 12)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_12.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_12.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_12.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_12.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4125,7 +4749,8 @@ generate if (MAX_CHANNELS > 13)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[13])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_13.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_13.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_13.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4166,6 +4791,7 @@ generate if (MAX_CHANNELS > 13)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_13.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_13.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_13.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_13.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4229,7 +4855,8 @@ generate if (MAX_CHANNELS > 14)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[14])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_14.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_14.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_14.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4270,6 +4897,7 @@ generate if (MAX_CHANNELS > 14)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_14.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_14.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_14.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_14.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4333,7 +4961,8 @@ generate if (MAX_CHANNELS > 15)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[15])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_15.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_15.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_15.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4374,6 +5003,7 @@ generate if (MAX_CHANNELS > 15)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_15.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_15.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_15.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_15.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4437,7 +5067,8 @@ generate if (MAX_CHANNELS > 16)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[16])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_16.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_16.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_16.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4478,6 +5109,7 @@ generate if (MAX_CHANNELS > 16)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_16.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_16.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_16.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_16.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4541,7 +5173,8 @@ generate if (MAX_CHANNELS > 17)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[17])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_17.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_17.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_17.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4582,6 +5215,7 @@ generate if (MAX_CHANNELS > 17)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_17.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_17.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_17.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_17.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4645,7 +5279,8 @@ generate if (MAX_CHANNELS > 18)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[18])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_18.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_18.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_18.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4686,6 +5321,7 @@ generate if (MAX_CHANNELS > 18)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_18.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_18.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_18.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_18.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4749,7 +5385,8 @@ generate if (MAX_CHANNELS > 19)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[19])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_19.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_19.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_19.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4790,6 +5427,7 @@ generate if (MAX_CHANNELS > 19)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_19.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_19.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_19.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_19.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4853,7 +5491,8 @@ generate if (MAX_CHANNELS > 20)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[20])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_20.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_20.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_20.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4894,6 +5533,7 @@ generate if (MAX_CHANNELS > 20)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_20.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_20.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_20.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_20.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -4957,7 +5597,8 @@ generate if (MAX_CHANNELS > 21)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[21])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_21.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_21.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_21.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4998,6 +5639,7 @@ generate if (MAX_CHANNELS > 21)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_21.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_21.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_21.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_21.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -5061,7 +5703,8 @@ generate if (MAX_CHANNELS > 22)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[22])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_22.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_22.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_22.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -5102,6 +5745,7 @@ generate if (MAX_CHANNELS > 22)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_22.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_22.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_22.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_22.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else
@@ -5165,7 +5809,8 @@ generate if (MAX_CHANNELS > 23)
             .altpcs_carrierdetect(pcs_rx_carrierdetected[23])
            ) ;
 		defparam
-		the_altera_tse_gxb_aligned_rxsync_23.DEVICE_FAMILY = DEVICE_FAMILY;    
+		the_altera_tse_gxb_aligned_rxsync_23.DEVICE_FAMILY = DEVICE_FAMILY,    
+		the_altera_tse_gxb_aligned_rxsync_23.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -5206,6 +5851,7 @@ generate if (MAX_CHANNELS > 23)
    defparam
         the_altera_tse_gxb_gige_phyip_inst_23.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
         the_altera_tse_gxb_gige_phyip_inst_23.ENABLE_SGMII = ENABLE_SGMII,
+        the_altera_tse_gxb_gige_phyip_inst_23.ENABLE_DET_LATENCY = ENABLE_TIMESTAMPING,
         the_altera_tse_gxb_gige_phyip_inst_23.DEVICE_FAMILY = DEVICE_FAMILY; 
     end
 else

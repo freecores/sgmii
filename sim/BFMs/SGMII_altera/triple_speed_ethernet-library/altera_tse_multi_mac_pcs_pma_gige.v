@@ -1,3 +1,4 @@
+
 // -------------------------------------------------------------------------
 // -------------------------------------------------------------------------
 //
@@ -6,9 +7,9 @@
 // $RCSfile: altera_tse_multi_mac_pcs_pma_gige.v,v $
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/RTL/Top_level_modules/altera_tse_multi_mac_pcs_pma_gige.v,v $
 //
-// $Revision: #3 $
-// $Date: 2011/12/15 $
-// Check in by : $Author: perforce $
+// $Revision: #1 $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : Arul Paniandi
 //
 // Project     : Triple Speed Ethernet - 10/100/1000 MAC
@@ -71,14 +72,19 @@ parameter EXPORT_PWRDN          = 1'b0,                 //  Option to export the
 parameter DEVICE_FAMILY         = "ARRIAGX",            //  The device family the the core is targetted for.
 parameter TRANSCEIVER_OPTION    = 1'b0,                 //  Option to select transceiver block for MAC PCS PMA Instantiation. Valid Values are 0 and 1:  0 - GXB (GIGE Mode) 1 - LVDS IO
 parameter ENABLE_ALT_RECONFIG   = 0,                    //  Option to expose the altreconfig ports
-parameter SYNCHRONIZER_DEPTH 	= 3,	  	        //  Number of synchronizer
+parameter SYNCHRONIZER_DEPTH    = 3,                    //  Number of synchronizer
 // Internal parameters
 parameter STARTING_CHANNEL_NUMBER = 0,
 parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
                        (MAX_CHANNELS > 8)? 12 : 
                        (MAX_CHANNELS > 4)? 11 : 
                        (MAX_CHANNELS > 2)? 10 :  
-                       (MAX_CHANNELS > 1)? 9 : 8
+                       (MAX_CHANNELS > 1)? 9 : 8,
+//IEEE1588 code
+parameter ENABLE_TIMESTAMPING               = 0,                //      To enable time stamping logic
+parameter ENABLE_PTP_1STEP                      = 0,            //      To enable time 1 step clock PTP
+parameter TSTAMP_FP_WIDTH                   = 4         //      Finger print width associated to the timestamp request
+
 )
 
 
@@ -86,1184 +92,1497 @@ parameter ADDR_WIDTH = (MAX_CHANNELS > 16)? 13 :
 (
 
     // RESET / MAC REG IF / MDIO
-    input wire   reset,                      //  Asynchronous Reset - clk Domain
-    input wire   clk,                        //  25MHz Host Interface Clock
-    input wire   read,                       //  Register Read Strobe
-    input wire   write,                      //  Register Write Strobe
-    input wire   [ADDR_WIDTH-1:0] address,   //  Register Address
-    input wire   [31:0] writedata,           //  Write Data for Host Bus
-    output wire  [31:0] readdata,            //  Read Data to Host Bus
-    output wire  waitrequest,                //  Interface Busy
-    output wire  mdc,                        //  2.5MHz Inteface
-    input wire   mdio_in,                    //  MDIO Input
-    output wire  mdio_out,                   //  MDIO Output
-    output wire  mdio_oen,                   //  MDIO Output Enable
+    input wire                               reset, //  Asynchronous Reset - clk Domain
+    input wire                               clk, //  25MHz Host Interface Clock
+    input wire                               read, //  Register Read Strobe
+    input wire                               write, //  Register Write Strobe
+    input wire [ADDR_WIDTH-1:0]              address, //  Register Address
+    input wire [31:0]                        writedata, //  Write Data for Host Bus
+    output wire [31:0]                       readdata, //  Read Data to Host Bus
+    output wire                              waitrequest, //  Interface Busy
+    output wire                              mdc, //  2.5MHz Inteface
+    input wire                               mdio_in, //  MDIO Input
+    output wire                              mdio_out, //  MDIO Output
+    output wire                              mdio_oen, //  MDIO Output Enable
 
     // DEVICE SPECIFIC SIGNALS
-    input wire   gxb_cal_blk_clk,            //  GXB Calibration Clock
-    input wire   ref_clk,                    //  Rference Clock
+    input wire                               gxb_cal_blk_clk, //  GXB Calibration Clock
+    input wire                               ref_clk, //  Rference Clock
 
-	// SHARED CLK SIGNALS
-    output wire  mac_rx_clk,                 //  Av-ST Receive Clock
-    output wire  mac_tx_clk,                 //  Av-ST Transmit Clock 
+        // SHARED CLK SIGNALS
+    output wire                              mac_rx_clk, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk, //  Av-ST Transmit Clock 
+    input wire                               pcs_phase_measure_clk,
 
-	// SHARED RX STATUS
-    input wire   rx_afull_clk,                             //  Almost full clk
-    input wire   [1:0] rx_afull_data,                      //  Almost full data
-    input wire   rx_afull_valid,                           //  Almost full valid
-    input wire   [CHANNEL_WIDTH-1:0] rx_afull_channel,     //  Almost full channel
+        // SHARED RX STATUS
+    input wire                               rx_afull_clk, //  Almost full clk
+    input wire [1:0]                         rx_afull_data, //  Almost full data
+    input wire                               rx_afull_valid, //  Almost full valid
+    input wire [CHANNEL_WIDTH-1:0]           rx_afull_channel, //  Almost full channel
 
 
     // CHANNEL 0
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_0,                    //  Differential Receive Data 
-    output wire  txp_0,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_0,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_0,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_0,         //  Receiver Recovered Clock 
-    output wire  led_crs_0,                //  Carrier Sense
-    output wire  led_link_0,               //  Valid Link 
-    output wire  led_col_0,                //  Collision Indication
-    output wire  led_an_0,                 //  Auto-Negotiation Status
-    output wire  led_char_err_0,           //  Character Error
-    output wire  led_disp_err_0,           //  Disparity Error
+    input wire                               rxp_0, //  Differential Receive Data 
+    output wire                              txp_0, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_0, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_0, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_0, //  Receiver Recovered Clock 
+    output wire                              led_crs_0, //  Carrier Sense
+    output wire                              led_link_0, //  Valid Link 
+    output wire                              led_col_0, //  Collision Indication
+    output wire                              led_an_0, //  Auto-Negotiation Status
+    output wire                              led_char_err_0, //  Character Error
+    output wire                              led_disp_err_0, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_0,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_0,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_0,            //  Start of Packet
-    output wire  data_rx_eop_0,            //  End of Packet
-    output wire  [7:0] data_rx_data_0,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_0,    //  Receive packet error
-    output wire  data_rx_valid_0,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_0,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_0,   //  Frame Type Indication
-    output wire  pkt_class_valid_0,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_0,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_0,     //  Data from FIFO transmit
-    input wire   data_tx_valid_0,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_0,            //  Start of Packet
-    input wire   data_tx_eop_0,            //  END of Packet
-    output wire  data_tx_ready_0,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_0, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_0, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_0, //  Start of Packet
+    output wire                              data_rx_eop_0, //  End of Packet
+    output wire [7:0]                        data_rx_data_0, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_0, //  Receive packet error
+    output wire                              data_rx_valid_0, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_0, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_0, //  Frame Type Indication
+    output wire                              pkt_class_valid_0, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_0, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_0, //  Data from FIFO transmit
+    input wire                               data_tx_valid_0, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_0, //  Start of Packet
+    input wire                               data_tx_eop_0, //  END of Packet
+    output wire                              data_tx_ready_0, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_0,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_0,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_0,               //  Xoff Pause frame generate 
-    input wire   xon_gen_0,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_0,          //  Enable Sleep Mode
-    output wire  magic_wakeup_0,           //  Wake Up Request
+    output wire                              tx_ff_uflow_0, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_0, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_0, //  Xoff Pause frame generate 
+    input wire                               xon_gen_0, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_0, //  Enable Sleep Mode
+    output wire                              magic_wakeup_0, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_0, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_0, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_0, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_0, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_0, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_0, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_0, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_0, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_0, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_0, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_0, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_0,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_0,            //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_0,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_0,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_0, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_0, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_0, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_0, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 1
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_1,                    //  Differential Receive Data 
-    output wire  txp_1,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_1,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_1,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_1,         //  Receiver Recovered Clock 
-    output wire  led_crs_1,                //  Carrier Sense
-    output wire  led_link_1,               //  Valid Link 
-    output wire  led_col_1,                //  Collision Indication
-    output wire  led_an_1,                 //  Auto-Negotiation Status
-    output wire  led_char_err_1,           //  Character Error
-    output wire  led_disp_err_1,           //  Disparity Error
+    input wire                               rxp_1, //  Differential Receive Data 
+    output wire                              txp_1, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_1, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_1, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_1, //  Receiver Recovered Clock 
+    output wire                              led_crs_1, //  Carrier Sense
+    output wire                              led_link_1, //  Valid Link 
+    output wire                              led_col_1, //  Collision Indication
+    output wire                              led_an_1, //  Auto-Negotiation Status
+    output wire                              led_char_err_1, //  Character Error
+    output wire                              led_disp_err_1, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_1,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_1,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_1,            //  Start of Packet
-    output wire  data_rx_eop_1,            //  End of Packet
-    output wire  [7:0] data_rx_data_1,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_1,    //  Receive packet error
-    output wire  data_rx_valid_1,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_1,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_1,   //  Frame Type Indication
-    output wire  pkt_class_valid_1,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_1,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_1,     //  Data from FIFO transmit
-    input wire   data_tx_valid_1,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_1,            //  Start of Packet
-    input wire   data_tx_eop_1,            //  END of Packet
-    output wire  data_tx_ready_1,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_1, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_1, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_1, //  Start of Packet
+    output wire                              data_rx_eop_1, //  End of Packet
+    output wire [7:0]                        data_rx_data_1, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_1, //  Receive packet error
+    output wire                              data_rx_valid_1, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_1, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_1, //  Frame Type Indication
+    output wire                              pkt_class_valid_1, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_1, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_1, //  Data from FIFO transmit
+    input wire                               data_tx_valid_1, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_1, //  Start of Packet
+    input wire                               data_tx_eop_1, //  END of Packet
+    output wire                              data_tx_ready_1, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_1,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_1,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_1,               //  Xoff Pause frame generate 
-    input wire   xon_gen_1,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_1,          //  Enable Sleep Mode
-    output wire  magic_wakeup_1,           //  Wake Up Request
+    output wire                              tx_ff_uflow_1, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_1, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_1, //  Xoff Pause frame generate 
+    input wire                               xon_gen_1, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_1, //  Enable Sleep Mode
+    output wire                              magic_wakeup_1, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_1, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_1, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_1, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_1, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_1, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_1, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_1, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_1, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_1, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_1, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_1, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_1,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_1,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_1,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_1,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_1, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_1, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_1, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_1, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 2
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_2,                    //  Differential Receive Data 
-    output wire  txp_2,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_2,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_2,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_2,         //  Receiver Recovered Clock 
-    output wire  led_crs_2,                //  Carrier Sense
-    output wire  led_link_2,               //  Valid Link 
-    output wire  led_col_2,                //  Collision Indication
-    output wire  led_an_2,                 //  Auto-Negotiation Status
-    output wire  led_char_err_2,           //  Character Error
-    output wire  led_disp_err_2,           //  Disparity Error
+    input wire                               rxp_2, //  Differential Receive Data 
+    output wire                              txp_2, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_2, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_2, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_2, //  Receiver Recovered Clock 
+    output wire                              led_crs_2, //  Carrier Sense
+    output wire                              led_link_2, //  Valid Link 
+    output wire                              led_col_2, //  Collision Indication
+    output wire                              led_an_2, //  Auto-Negotiation Status
+    output wire                              led_char_err_2, //  Character Error
+    output wire                              led_disp_err_2, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_2,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_2,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_2,            //  Start of Packet
-    output wire  data_rx_eop_2,            //  End of Packet
-    output wire  [7:0] data_rx_data_2,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_2,    //  Receive packet error
-    output wire  data_rx_valid_2,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_2,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_2,   //  Frame Type Indication
-    output wire  pkt_class_valid_2,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_2,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_2,     //  Data from FIFO transmit
-    input wire   data_tx_valid_2,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_2,            //  Start of Packet
-    input wire   data_tx_eop_2,            //  END of Packet
-    output wire  data_tx_ready_2,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_2, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_2, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_2, //  Start of Packet
+    output wire                              data_rx_eop_2, //  End of Packet
+    output wire [7:0]                        data_rx_data_2, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_2, //  Receive packet error
+    output wire                              data_rx_valid_2, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_2, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_2, //  Frame Type Indication
+    output wire                              pkt_class_valid_2, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_2, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_2, //  Data from FIFO transmit
+    input wire                               data_tx_valid_2, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_2, //  Start of Packet
+    input wire                               data_tx_eop_2, //  END of Packet
+    output wire                              data_tx_ready_2, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_2,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_2,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_2,               //  Xoff Pause frame generate 
-    input wire   xon_gen_2,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_2,          //  Enable Sleep Mode
-    output wire  magic_wakeup_2,           //  Wake Up Request
+    output wire                              tx_ff_uflow_2, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_2, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_2, //  Xoff Pause frame generate 
+    input wire                               xon_gen_2, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_2, //  Enable Sleep Mode
+    output wire                              magic_wakeup_2, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_2, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_2, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_2, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_2, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_2, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_2, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_2, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_2, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_2, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_2, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_2, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_2,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_2,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_2,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_2,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_2, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_2, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_2, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_2, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 3
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_3,                    //  Differential Receive Data 
-    output wire  txp_3,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_3,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_3,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_3,         //  Receiver Recovered Clock 
-    output wire  led_crs_3,                //  Carrier Sense
-    output wire  led_link_3,               //  Valid Link 
-    output wire  led_col_3,                //  Collision Indication
-    output wire  led_an_3,                 //  Auto-Negotiation Status
-    output wire  led_char_err_3,           //  Character Error
-    output wire  led_disp_err_3,           //  Disparity Error
+    input wire                               rxp_3, //  Differential Receive Data 
+    output wire                              txp_3, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_3, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_3, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_3, //  Receiver Recovered Clock 
+    output wire                              led_crs_3, //  Carrier Sense
+    output wire                              led_link_3, //  Valid Link 
+    output wire                              led_col_3, //  Collision Indication
+    output wire                              led_an_3, //  Auto-Negotiation Status
+    output wire                              led_char_err_3, //  Character Error
+    output wire                              led_disp_err_3, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_3,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_3,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_3,            //  Start of Packet
-    output wire  data_rx_eop_3,            //  End of Packet
-    output wire  [7:0] data_rx_data_3,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_3,    //  Receive packet error
-    output wire  data_rx_valid_3,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_3,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_3,   //  Frame Type Indication
-    output wire  pkt_class_valid_3,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_3,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_3,     //  Data from FIFO transmit
-    input wire   data_tx_valid_3,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_3,            //  Start of Packet
-    input wire   data_tx_eop_3,            //  END of Packet
-    output wire  data_tx_ready_3,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_3, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_3, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_3, //  Start of Packet
+    output wire                              data_rx_eop_3, //  End of Packet
+    output wire [7:0]                        data_rx_data_3, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_3, //  Receive packet error
+    output wire                              data_rx_valid_3, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_3, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_3, //  Frame Type Indication
+    output wire                              pkt_class_valid_3, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_3, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_3, //  Data from FIFO transmit
+    input wire                               data_tx_valid_3, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_3, //  Start of Packet
+    input wire                               data_tx_eop_3, //  END of Packet
+    output wire                              data_tx_ready_3, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_3,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_3,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_3,               //  Xoff Pause frame generate 
-    input wire   xon_gen_3,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_3,          //  Enable Sleep Mode
-    output wire  magic_wakeup_3,           //  Wake Up Request
+    output wire                              tx_ff_uflow_3, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_3, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_3, //  Xoff Pause frame generate 
+    input wire                               xon_gen_3, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_3, //  Enable Sleep Mode
+    output wire                              magic_wakeup_3, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_3, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_3, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_3, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_3, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_3, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_3, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_3, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_3, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_3, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_3, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_3, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_3,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_3,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_3,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_3,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_3, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_3, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_3, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_3, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 4
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_4,                    //  Differential Receive Data 
-    output wire  txp_4,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_4,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_4,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_4,         //  Receiver Recovered Clock 
-    output wire  led_crs_4,                //  Carrier Sense
-    output wire  led_link_4,               //  Valid Link 
-    output wire  led_col_4,                //  Collision Indication
-    output wire  led_an_4,                 //  Auto-Negotiation Status
-    output wire  led_char_err_4,           //  Character Error
-    output wire  led_disp_err_4,           //  Disparity Error
+    input wire                               rxp_4, //  Differential Receive Data 
+    output wire                              txp_4, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_4, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_4, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_4, //  Receiver Recovered Clock 
+    output wire                              led_crs_4, //  Carrier Sense
+    output wire                              led_link_4, //  Valid Link 
+    output wire                              led_col_4, //  Collision Indication
+    output wire                              led_an_4, //  Auto-Negotiation Status
+    output wire                              led_char_err_4, //  Character Error
+    output wire                              led_disp_err_4, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_4,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_4,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_4,            //  Start of Packet
-    output wire  data_rx_eop_4,            //  End of Packet
-    output wire  [7:0] data_rx_data_4,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_4,    //  Receive packet error
-    output wire  data_rx_valid_4,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_4,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_4,   //  Frame Type Indication
-    output wire  pkt_class_valid_4,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_4,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_4,     //  Data from FIFO transmit
-    input wire   data_tx_valid_4,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_4,            //  Start of Packet
-    input wire   data_tx_eop_4,            //  END of Packet
-    output wire  data_tx_ready_4,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_4, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_4, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_4, //  Start of Packet
+    output wire                              data_rx_eop_4, //  End of Packet
+    output wire [7:0]                        data_rx_data_4, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_4, //  Receive packet error
+    output wire                              data_rx_valid_4, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_4, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_4, //  Frame Type Indication
+    output wire                              pkt_class_valid_4, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_4, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_4, //  Data from FIFO transmit
+    input wire                               data_tx_valid_4, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_4, //  Start of Packet
+    input wire                               data_tx_eop_4, //  END of Packet
+    output wire                              data_tx_ready_4, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_4,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_4,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_4,               //  Xoff Pause frame generate 
-    input wire   xon_gen_4,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_4,          //  Enable Sleep Mode
-    output wire  magic_wakeup_4,           //  Wake Up Request
+    output wire                              tx_ff_uflow_4, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_4, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_4, //  Xoff Pause frame generate 
+    input wire                               xon_gen_4, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_4, //  Enable Sleep Mode
+    output wire                              magic_wakeup_4, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_4, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_4, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_4, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_4, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_4, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_4, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_4, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_4, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_4, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_4, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_4, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_4,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_4,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_4,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_4,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_4, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_4, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_4, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_4, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 5
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_5,                    //  Differential Receive Data 
-    output wire  txp_5,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_5,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_5,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_5,         //  Receiver Recovered Clock 
-    output wire  led_crs_5,                //  Carrier Sense
-    output wire  led_link_5,               //  Valid Link 
-    output wire  led_col_5,                //  Collision Indication
-    output wire  led_an_5,                 //  Auto-Negotiation Status
-    output wire  led_char_err_5,           //  Character Error
-    output wire  led_disp_err_5,           //  Disparity Error
+    input wire                               rxp_5, //  Differential Receive Data 
+    output wire                              txp_5, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_5, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_5, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_5, //  Receiver Recovered Clock 
+    output wire                              led_crs_5, //  Carrier Sense
+    output wire                              led_link_5, //  Valid Link 
+    output wire                              led_col_5, //  Collision Indication
+    output wire                              led_an_5, //  Auto-Negotiation Status
+    output wire                              led_char_err_5, //  Character Error
+    output wire                              led_disp_err_5, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_5,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_5,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_5,            //  Start of Packet
-    output wire  data_rx_eop_5,            //  End of Packet
-    output wire  [7:0] data_rx_data_5,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_5,    //  Receive packet error
-    output wire  data_rx_valid_5,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_5,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_5,   //  Frame Type Indication
-    output wire  pkt_class_valid_5,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_5,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_5,     //  Data from FIFO transmit
-    input wire   data_tx_valid_5,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_5,            //  Start of Packet
-    input wire   data_tx_eop_5,            //  END of Packet
-    output wire  data_tx_ready_5,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_5, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_5, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_5, //  Start of Packet
+    output wire                              data_rx_eop_5, //  End of Packet
+    output wire [7:0]                        data_rx_data_5, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_5, //  Receive packet error
+    output wire                              data_rx_valid_5, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_5, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_5, //  Frame Type Indication
+    output wire                              pkt_class_valid_5, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_5, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_5, //  Data from FIFO transmit
+    input wire                               data_tx_valid_5, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_5, //  Start of Packet
+    input wire                               data_tx_eop_5, //  END of Packet
+    output wire                              data_tx_ready_5, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_5,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_5,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_5,               //  Xoff Pause frame generate 
-    input wire   xon_gen_5,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_5,          //  Enable Sleep Mode
-    output wire  magic_wakeup_5,           //  Wake Up Request
+    output wire                              tx_ff_uflow_5, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_5, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_5, //  Xoff Pause frame generate 
+    input wire                               xon_gen_5, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_5, //  Enable Sleep Mode
+    output wire                              magic_wakeup_5, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_5, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_5, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_5, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_5, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_5, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_5, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_5, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_5, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_5, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_5, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_5, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_5,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_5,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_5,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_5,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_5, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_5, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_5, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_5, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 6
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_6,                    //  Differential Receive Data 
-    output wire  txp_6,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_6,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_6,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_6,         //  Receiver Recovered Clock 
-    output wire  led_crs_6,                //  Carrier Sense
-    output wire  led_link_6,               //  Valid Link 
-    output wire  led_col_6,                //  Collision Indication
-    output wire  led_an_6,                 //  Auto-Negotiation Status
-    output wire  led_char_err_6,           //  Character Error
-    output wire  led_disp_err_6,           //  Disparity Error
+    input wire                               rxp_6, //  Differential Receive Data 
+    output wire                              txp_6, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_6, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_6, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_6, //  Receiver Recovered Clock 
+    output wire                              led_crs_6, //  Carrier Sense
+    output wire                              led_link_6, //  Valid Link 
+    output wire                              led_col_6, //  Collision Indication
+    output wire                              led_an_6, //  Auto-Negotiation Status
+    output wire                              led_char_err_6, //  Character Error
+    output wire                              led_disp_err_6, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_6,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_6,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_6,            //  Start of Packet
-    output wire  data_rx_eop_6,            //  End of Packet
-    output wire  [7:0] data_rx_data_6,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_6,    //  Receive packet error
-    output wire  data_rx_valid_6,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_6,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_6,   //  Frame Type Indication
-    output wire  pkt_class_valid_6,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_6,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_6,     //  Data from FIFO transmit
-    input wire   data_tx_valid_6,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_6,            //  Start of Packet
-    input wire   data_tx_eop_6,            //  END of Packet
-    output wire  data_tx_ready_6,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_6, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_6, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_6, //  Start of Packet
+    output wire                              data_rx_eop_6, //  End of Packet
+    output wire [7:0]                        data_rx_data_6, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_6, //  Receive packet error
+    output wire                              data_rx_valid_6, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_6, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_6, //  Frame Type Indication
+    output wire                              pkt_class_valid_6, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_6, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_6, //  Data from FIFO transmit
+    input wire                               data_tx_valid_6, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_6, //  Start of Packet
+    input wire                               data_tx_eop_6, //  END of Packet
+    output wire                              data_tx_ready_6, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_6,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_6,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_6,               //  Xoff Pause frame generate 
-    input wire   xon_gen_6,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_6,          //  Enable Sleep Mode
-    output wire  magic_wakeup_6,           //  Wake Up Request
+    output wire                              tx_ff_uflow_6, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_6, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_6, //  Xoff Pause frame generate 
+    input wire                               xon_gen_6, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_6, //  Enable Sleep Mode
+    output wire                              magic_wakeup_6, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_6, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_6, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_6, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_6, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_6, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_6, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_6, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_6, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_6, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_6, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_6, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_6,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_6,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_6,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_6,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_6, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_6, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_6, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_6, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 7
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_7,                    //  Differential Receive Data 
-    output wire  txp_7,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_7,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_7,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_7,         //  Receiver Recovered Clock 
-    output wire  led_crs_7,                //  Carrier Sense
-    output wire  led_link_7,               //  Valid Link 
-    output wire  led_col_7,                //  Collision Indication
-    output wire  led_an_7,                 //  Auto-Negotiation Status
-    output wire  led_char_err_7,           //  Character Error
-    output wire  led_disp_err_7,           //  Disparity Error
+    input wire                               rxp_7, //  Differential Receive Data 
+    output wire                              txp_7, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_7, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_7, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_7, //  Receiver Recovered Clock 
+    output wire                              led_crs_7, //  Carrier Sense
+    output wire                              led_link_7, //  Valid Link 
+    output wire                              led_col_7, //  Collision Indication
+    output wire                              led_an_7, //  Auto-Negotiation Status
+    output wire                              led_char_err_7, //  Character Error
+    output wire                              led_disp_err_7, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_7,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_7,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_7,            //  Start of Packet
-    output wire  data_rx_eop_7,            //  End of Packet
-    output wire  [7:0] data_rx_data_7,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_7,    //  Receive packet error
-    output wire  data_rx_valid_7,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_7,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_7,   //  Frame Type Indication
-    output wire  pkt_class_valid_7,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_7,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_7,     //  Data from FIFO transmit
-    input wire   data_tx_valid_7,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_7,            //  Start of Packet
-    input wire   data_tx_eop_7,            //  END of Packet
-    output wire  data_tx_ready_7,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_7, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_7, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_7, //  Start of Packet
+    output wire                              data_rx_eop_7, //  End of Packet
+    output wire [7:0]                        data_rx_data_7, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_7, //  Receive packet error
+    output wire                              data_rx_valid_7, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_7, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_7, //  Frame Type Indication
+    output wire                              pkt_class_valid_7, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_7, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_7, //  Data from FIFO transmit
+    input wire                               data_tx_valid_7, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_7, //  Start of Packet
+    input wire                               data_tx_eop_7, //  END of Packet
+    output wire                              data_tx_ready_7, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_7,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_7,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_7,               //  Xoff Pause frame generate 
-    input wire   xon_gen_7,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_7,          //  Enable Sleep Mode
-    output wire  magic_wakeup_7,           //  Wake Up Request
+    output wire                              tx_ff_uflow_7, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_7, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_7, //  Xoff Pause frame generate 
+    input wire                               xon_gen_7, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_7, //  Enable Sleep Mode
+    output wire                              magic_wakeup_7, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_7, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_7, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_7, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_7, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_7, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_7, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_7, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_7, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_7, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_7, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_7, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_7,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_7,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_7,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_7,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_7, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_7, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_7, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_7, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 8
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_8,                    //  Differential Receive Data 
-    output wire  txp_8,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_8,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_8,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_8,         //  Receiver Recovered Clock 
-    output wire  led_crs_8,                //  Carrier Sense
-    output wire  led_link_8,               //  Valid Link 
-    output wire  led_col_8,                //  Collision Indication
-    output wire  led_an_8,                 //  Auto-Negotiation Status
-    output wire  led_char_err_8,           //  Character Error
-    output wire  led_disp_err_8,           //  Disparity Error
+    input wire                               rxp_8, //  Differential Receive Data 
+    output wire                              txp_8, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_8, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_8, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_8, //  Receiver Recovered Clock 
+    output wire                              led_crs_8, //  Carrier Sense
+    output wire                              led_link_8, //  Valid Link 
+    output wire                              led_col_8, //  Collision Indication
+    output wire                              led_an_8, //  Auto-Negotiation Status
+    output wire                              led_char_err_8, //  Character Error
+    output wire                              led_disp_err_8, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_8,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_8,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_8,            //  Start of Packet
-    output wire  data_rx_eop_8,            //  End of Packet
-    output wire  [7:0] data_rx_data_8,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_8,    //  Receive packet error
-    output wire  data_rx_valid_8,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_8,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_8,   //  Frame Type Indication
-    output wire  pkt_class_valid_8,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_8,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_8,     //  Data from FIFO transmit
-    input wire   data_tx_valid_8,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_8,            //  Start of Packet
-    input wire   data_tx_eop_8,            //  END of Packet
-    output wire  data_tx_ready_8,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_8, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_8, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_8, //  Start of Packet
+    output wire                              data_rx_eop_8, //  End of Packet
+    output wire [7:0]                        data_rx_data_8, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_8, //  Receive packet error
+    output wire                              data_rx_valid_8, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_8, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_8, //  Frame Type Indication
+    output wire                              pkt_class_valid_8, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_8, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_8, //  Data from FIFO transmit
+    input wire                               data_tx_valid_8, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_8, //  Start of Packet
+    input wire                               data_tx_eop_8, //  END of Packet
+    output wire                              data_tx_ready_8, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_8,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_8,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_8,               //  Xoff Pause frame generate 
-    input wire   xon_gen_8,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_8,          //  Enable Sleep Mode
-    output wire  magic_wakeup_8,           //  Wake Up Request
+    output wire                              tx_ff_uflow_8, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_8, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_8, //  Xoff Pause frame generate 
+    input wire                               xon_gen_8, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_8, //  Enable Sleep Mode
+    output wire                              magic_wakeup_8, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_8, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_8, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_8, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_8, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_8, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_8, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_8, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_8, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_8, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_8, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_8, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_8,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_8,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_8,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_8,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_8, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_8, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_8, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_8, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 9
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_9,                    //  Differential Receive Data 
-    output wire  txp_9,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_9,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_9,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_9,         //  Receiver Recovered Clock 
-    output wire  led_crs_9,                //  Carrier Sense
-    output wire  led_link_9,               //  Valid Link 
-    output wire  led_col_9,                //  Collision Indication
-    output wire  led_an_9,                 //  Auto-Negotiation Status
-    output wire  led_char_err_9,           //  Character Error
-    output wire  led_disp_err_9,           //  Disparity Error
+    input wire                               rxp_9, //  Differential Receive Data 
+    output wire                              txp_9, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_9, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_9, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_9, //  Receiver Recovered Clock 
+    output wire                              led_crs_9, //  Carrier Sense
+    output wire                              led_link_9, //  Valid Link 
+    output wire                              led_col_9, //  Collision Indication
+    output wire                              led_an_9, //  Auto-Negotiation Status
+    output wire                              led_char_err_9, //  Character Error
+    output wire                              led_disp_err_9, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_9,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_9,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_9,            //  Start of Packet
-    output wire  data_rx_eop_9,            //  End of Packet
-    output wire  [7:0] data_rx_data_9,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_9,    //  Receive packet error
-    output wire  data_rx_valid_9,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_9,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_9,   //  Frame Type Indication
-    output wire  pkt_class_valid_9,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_9,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_9,     //  Data from FIFO transmit
-    input wire   data_tx_valid_9,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_9,            //  Start of Packet
-    input wire   data_tx_eop_9,            //  END of Packet
-    output wire  data_tx_ready_9,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_9, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_9, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_9, //  Start of Packet
+    output wire                              data_rx_eop_9, //  End of Packet
+    output wire [7:0]                        data_rx_data_9, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_9, //  Receive packet error
+    output wire                              data_rx_valid_9, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_9, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_9, //  Frame Type Indication
+    output wire                              pkt_class_valid_9, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_9, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_9, //  Data from FIFO transmit
+    input wire                               data_tx_valid_9, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_9, //  Start of Packet
+    input wire                               data_tx_eop_9, //  END of Packet
+    output wire                              data_tx_ready_9, //  Data FIFO transmit Read Enable        
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_9,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_9,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_9,               //  Xoff Pause frame generate 
-    input wire   xon_gen_9,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_9,          //  Enable Sleep Mode
-    output wire  magic_wakeup_9,           //  Wake Up Request
+    output wire                              tx_ff_uflow_9, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_9, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_9, //  Xoff Pause frame generate 
+    input wire                               xon_gen_9, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_9, //  Enable Sleep Mode
+    output wire                              magic_wakeup_9, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_9, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_9, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_9, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_9, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_9, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_9, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_9, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_9, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_9, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_9, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_9, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_9,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_9,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_9,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_9,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_9, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_9, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_9, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_9, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 10
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_10,                    //  Differential Receive Data 
-    output wire  txp_10,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_10,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_10,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_10,         //  Receiver Recovered Clock 
-    output wire  led_crs_10,                //  Carrier Sense
-    output wire  led_link_10,               //  Valid Link 
-    output wire  led_col_10,                //  Collision Indication
-    output wire  led_an_10,                 //  Auto-Negotiation Status
-    output wire  led_char_err_10,           //  Character Error
-    output wire  led_disp_err_10,           //  Disparity Error
+    input wire                               rxp_10, //  Differential Receive Data 
+    output wire                              txp_10, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_10, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_10, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_10, //  Receiver Recovered Clock 
+    output wire                              led_crs_10, //  Carrier Sense
+    output wire                              led_link_10, //  Valid Link 
+    output wire                              led_col_10, //  Collision Indication
+    output wire                              led_an_10, //  Auto-Negotiation Status
+    output wire                              led_char_err_10, //  Character Error
+    output wire                              led_disp_err_10, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_10,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_10,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_10,            //  Start of Packet
-    output wire  data_rx_eop_10,            //  End of Packet
-    output wire  [7:0] data_rx_data_10,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_10,    //  Receive packet error
-    output wire  data_rx_valid_10,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_10,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_10,   //  Frame Type Indication
-    output wire  pkt_class_valid_10,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_10,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_10,     //  Data from FIFO transmit
-    input wire   data_tx_valid_10,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_10,            //  Start of Packet
-    input wire   data_tx_eop_10,            //  END of Packet
-    output wire  data_tx_ready_10,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_10, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_10, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_10, //  Start of Packet
+    output wire                              data_rx_eop_10, //  End of Packet
+    output wire [7:0]                        data_rx_data_10, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_10, //  Receive packet error
+    output wire                              data_rx_valid_10, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_10, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_10, //  Frame Type Indication
+    output wire                              pkt_class_valid_10, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_10, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_10, //  Data from FIFO transmit
+    input wire                               data_tx_valid_10, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_10, //  Start of Packet
+    input wire                               data_tx_eop_10, //  END of Packet
+    output wire                              data_tx_ready_10, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_10,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_10,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_10,               //  Xoff Pause frame generate 
-    input wire   xon_gen_10,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_10,          //  Enable Sleep Mode
-    output wire  magic_wakeup_10,           //  Wake Up Request
+    output wire                              tx_ff_uflow_10, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_10, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_10, //  Xoff Pause frame generate 
+    input wire                               xon_gen_10, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_10, //  Enable Sleep Mode
+    output wire                              magic_wakeup_10, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_10, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_10, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_10, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_10, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_10, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_10, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_10, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_10, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_10, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_10, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_10, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_10,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_10,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_10,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_10,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_10, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_10, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_10, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_10, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 11
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_11,                    //  Differential Receive Data 
-    output wire  txp_11,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_11,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_11,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_11,         //  Receiver Recovered Clock 
-    output wire  led_crs_11,                //  Carrier Sense
-    output wire  led_link_11,               //  Valid Link 
-    output wire  led_col_11,                //  Collision Indication
-    output wire  led_an_11,                 //  Auto-Negotiation Status
-    output wire  led_char_err_11,           //  Character Error
-    output wire  led_disp_err_11,           //  Disparity Error
+    input wire                               rxp_11, //  Differential Receive Data 
+    output wire                              txp_11, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_11, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_11, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_11, //  Receiver Recovered Clock 
+    output wire                              led_crs_11, //  Carrier Sense
+    output wire                              led_link_11, //  Valid Link 
+    output wire                              led_col_11, //  Collision Indication
+    output wire                              led_an_11, //  Auto-Negotiation Status
+    output wire                              led_char_err_11, //  Character Error
+    output wire                              led_disp_err_11, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_11,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_11,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_11,            //  Start of Packet
-    output wire  data_rx_eop_11,            //  End of Packet
-    output wire  [7:0] data_rx_data_11,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_11,    //  Receive packet error
-    output wire  data_rx_valid_11,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_11,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_11,   //  Frame Type Indication
-    output wire  pkt_class_valid_11,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_11,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_11,     //  Data from FIFO transmit
-    input wire   data_tx_valid_11,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_11,            //  Start of Packet
-    input wire   data_tx_eop_11,            //  END of Packet
-    output wire  data_tx_ready_11,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_11, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_11, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_11, //  Start of Packet
+    output wire                              data_rx_eop_11, //  End of Packet
+    output wire [7:0]                        data_rx_data_11, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_11, //  Receive packet error
+    output wire                              data_rx_valid_11, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_11, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_11, //  Frame Type Indication
+    output wire                              pkt_class_valid_11, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_11, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_11, //  Data from FIFO transmit
+    input wire                               data_tx_valid_11, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_11, //  Start of Packet
+    input wire                               data_tx_eop_11, //  END of Packet
+    output wire                              data_tx_ready_11, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_11,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_11,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_11,               //  Xoff Pause frame generate 
-    input wire   xon_gen_11,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_11,          //  Enable Sleep Mode
-    output wire  magic_wakeup_11,           //  Wake Up Request
+    output wire                              tx_ff_uflow_11, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_11, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_11, //  Xoff Pause frame generate 
+    input wire                               xon_gen_11, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_11, //  Enable Sleep Mode
+    output wire                              magic_wakeup_11, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_11, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_11, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_11, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_11, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_11, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_11, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_11, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_11, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_11, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_11, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_11, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_11,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_11,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_11,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_11,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_11, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_11, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_11, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_11, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 12
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_12,                    //  Differential Receive Data 
-    output wire  txp_12,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_12,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_12,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_12,         //  Receiver Recovered Clock 
-    output wire  led_crs_12,                //  Carrier Sense
-    output wire  led_link_12,               //  Valid Link 
-    output wire  led_col_12,                //  Collision Indication
-    output wire  led_an_12,                 //  Auto-Negotiation Status
-    output wire  led_char_err_12,           //  Character Error
-    output wire  led_disp_err_12,           //  Disparity Error
+    input wire                               rxp_12, //  Differential Receive Data 
+    output wire                              txp_12, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_12, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_12, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_12, //  Receiver Recovered Clock 
+    output wire                              led_crs_12, //  Carrier Sense
+    output wire                              led_link_12, //  Valid Link 
+    output wire                              led_col_12, //  Collision Indication
+    output wire                              led_an_12, //  Auto-Negotiation Status
+    output wire                              led_char_err_12, //  Character Error
+    output wire                              led_disp_err_12, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_12,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_12,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_12,            //  Start of Packet
-    output wire  data_rx_eop_12,            //  End of Packet
-    output wire  [7:0] data_rx_data_12,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_12,    //  Receive packet error
-    output wire  data_rx_valid_12,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_12,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_12,   //  Frame Type Indication
-    output wire  pkt_class_valid_12,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_12,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_12,     //  Data from FIFO transmit
-    input wire   data_tx_valid_12,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_12,            //  Start of Packet
-    input wire   data_tx_eop_12,            //  END of Packet
-    output wire  data_tx_ready_12,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_12, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_12, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_12, //  Start of Packet
+    output wire                              data_rx_eop_12, //  End of Packet
+    output wire [7:0]                        data_rx_data_12, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_12, //  Receive packet error
+    output wire                              data_rx_valid_12, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_12, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_12, //  Frame Type Indication
+    output wire                              pkt_class_valid_12, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_12, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_12, //  Data from FIFO transmit
+    input wire                               data_tx_valid_12, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_12, //  Start of Packet
+    input wire                               data_tx_eop_12, //  END of Packet
+    output wire                              data_tx_ready_12, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_12,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_12,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_12,               //  Xoff Pause frame generate 
-    input wire   xon_gen_12,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_12,          //  Enable Sleep Mode
-    output wire  magic_wakeup_12,           //  Wake Up Request
+    output wire                              tx_ff_uflow_12, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_12, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_12, //  Xoff Pause frame generate 
+    input wire                               xon_gen_12, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_12, //  Enable Sleep Mode
+    output wire                              magic_wakeup_12, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_12, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_12, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_12, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_12, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_12, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_12, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_12, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_12, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_12, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_12, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_12, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_12,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_12,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_12,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_12,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_12, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_12, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_12, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_12, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 13
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_13,                    //  Differential Receive Data 
-    output wire  txp_13,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_13,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_13,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_13,         //  Receiver Recovered Clock 
-    output wire  led_crs_13,                //  Carrier Sense
-    output wire  led_link_13,               //  Valid Link 
-    output wire  led_col_13,                //  Collision Indication
-    output wire  led_an_13,                 //  Auto-Negotiation Status
-    output wire  led_char_err_13,           //  Character Error
-    output wire  led_disp_err_13,           //  Disparity Error
+    input wire                               rxp_13, //  Differential Receive Data 
+    output wire                              txp_13, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_13, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_13, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_13, //  Receiver Recovered Clock 
+    output wire                              led_crs_13, //  Carrier Sense
+    output wire                              led_link_13, //  Valid Link 
+    output wire                              led_col_13, //  Collision Indication
+    output wire                              led_an_13, //  Auto-Negotiation Status
+    output wire                              led_char_err_13, //  Character Error
+    output wire                              led_disp_err_13, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_13,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_13,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_13,            //  Start of Packet
-    output wire  data_rx_eop_13,            //  End of Packet
-    output wire  [7:0] data_rx_data_13,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_13,    //  Receive packet error
-    output wire  data_rx_valid_13,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_13,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_13,   //  Frame Type Indication
-    output wire  pkt_class_valid_13,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_13,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_13,     //  Data from FIFO transmit
-    input wire   data_tx_valid_13,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_13,            //  Start of Packet
-    input wire   data_tx_eop_13,            //  END of Packet
-    output wire  data_tx_ready_13,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_13, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_13, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_13, //  Start of Packet
+    output wire                              data_rx_eop_13, //  End of Packet
+    output wire [7:0]                        data_rx_data_13, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_13, //  Receive packet error
+    output wire                              data_rx_valid_13, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_13, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_13, //  Frame Type Indication
+    output wire                              pkt_class_valid_13, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_13, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_13, //  Data from FIFO transmit
+    input wire                               data_tx_valid_13, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_13, //  Start of Packet
+    input wire                               data_tx_eop_13, //  END of Packet
+    output wire                              data_tx_ready_13, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_13,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_13,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_13,               //  Xoff Pause frame generate 
-    input wire   xon_gen_13,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_13,          //  Enable Sleep Mode
-    output wire  magic_wakeup_13,           //  Wake Up Request
+    output wire                              tx_ff_uflow_13, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_13, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_13, //  Xoff Pause frame generate 
+    input wire                               xon_gen_13, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_13, //  Enable Sleep Mode
+    output wire                              magic_wakeup_13, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_13, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_13, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_13, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_13, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_13, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_13, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_13, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_13, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_13, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_13, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_13, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_13,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_13,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_13,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_13,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_13, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_13, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_13, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_13, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 14
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_14,                    //  Differential Receive Data 
-    output wire  txp_14,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_14,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_14,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_14,         //  Receiver Recovered Clock 
-    output wire  led_crs_14,                //  Carrier Sense
-    output wire  led_link_14,               //  Valid Link 
-    output wire  led_col_14,                //  Collision Indication
-    output wire  led_an_14,                 //  Auto-Negotiation Status
-    output wire  led_char_err_14,           //  Character Error
-    output wire  led_disp_err_14,           //  Disparity Error
+    input wire                               rxp_14, //  Differential Receive Data 
+    output wire                              txp_14, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_14, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_14, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_14, //  Receiver Recovered Clock 
+    output wire                              led_crs_14, //  Carrier Sense
+    output wire                              led_link_14, //  Valid Link 
+    output wire                              led_col_14, //  Collision Indication
+    output wire                              led_an_14, //  Auto-Negotiation Status
+    output wire                              led_char_err_14, //  Character Error
+    output wire                              led_disp_err_14, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_14,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_14,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_14,            //  Start of Packet
-    output wire  data_rx_eop_14,            //  End of Packet
-    output wire  [7:0] data_rx_data_14,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_14,    //  Receive packet error
-    output wire  data_rx_valid_14,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_14,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_14,   //  Frame Type Indication
-    output wire  pkt_class_valid_14,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_14,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_14,     //  Data from FIFO transmit
-    input wire   data_tx_valid_14,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_14,            //  Start of Packet
-    input wire   data_tx_eop_14,            //  END of Packet
-    output wire  data_tx_ready_14,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_14, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_14, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_14, //  Start of Packet
+    output wire                              data_rx_eop_14, //  End of Packet
+    output wire [7:0]                        data_rx_data_14, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_14, //  Receive packet error
+    output wire                              data_rx_valid_14, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_14, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_14, //  Frame Type Indication
+    output wire                              pkt_class_valid_14, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_14, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_14, //  Data from FIFO transmit
+    input wire                               data_tx_valid_14, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_14, //  Start of Packet
+    input wire                               data_tx_eop_14, //  END of Packet
+    output wire                              data_tx_ready_14, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_14,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_14,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_14,               //  Xoff Pause frame generate 
-    input wire   xon_gen_14,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_14,          //  Enable Sleep Mode
-    output wire  magic_wakeup_14,           //  Wake Up Request
+    output wire                              tx_ff_uflow_14, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_14, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_14, //  Xoff Pause frame generate 
+    input wire                               xon_gen_14, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_14, //  Enable Sleep Mode
+    output wire                              magic_wakeup_14, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_14, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_14, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_14, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_14, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_14, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_14, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_14, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_14, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_14, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_14, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_14, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_14,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_14,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_14,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_14,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_14, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_14, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_14, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_14, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 15
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_15,                    //  Differential Receive Data 
-    output wire  txp_15,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_15,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_15,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_15,         //  Receiver Recovered Clock 
-    output wire  led_crs_15,                //  Carrier Sense
-    output wire  led_link_15,               //  Valid Link 
-    output wire  led_col_15,                //  Collision Indication
-    output wire  led_an_15,                 //  Auto-Negotiation Status
-    output wire  led_char_err_15,           //  Character Error
-    output wire  led_disp_err_15,           //  Disparity Error
+    input wire                               rxp_15, //  Differential Receive Data 
+    output wire                              txp_15, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_15, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_15, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_15, //  Receiver Recovered Clock 
+    output wire                              led_crs_15, //  Carrier Sense
+    output wire                              led_link_15, //  Valid Link 
+    output wire                              led_col_15, //  Collision Indication
+    output wire                              led_an_15, //  Auto-Negotiation Status
+    output wire                              led_char_err_15, //  Character Error
+    output wire                              led_disp_err_15, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_15,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_15,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_15,            //  Start of Packet
-    output wire  data_rx_eop_15,            //  End of Packet
-    output wire  [7:0] data_rx_data_15,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_15,    //  Receive packet error
-    output wire  data_rx_valid_15,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_15,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_15,   //  Frame Type Indication
-    output wire  pkt_class_valid_15,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_15,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_15,     //  Data from FIFO transmit
-    input wire   data_tx_valid_15,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_15,            //  Start of Packet
-    input wire   data_tx_eop_15,            //  END of Packet
-    output wire  data_tx_ready_15,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_15, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_15, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_15, //  Start of Packet
+    output wire                              data_rx_eop_15, //  End of Packet
+    output wire [7:0]                        data_rx_data_15, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_15, //  Receive packet error
+    output wire                              data_rx_valid_15, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_15, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_15, //  Frame Type Indication
+    output wire                              pkt_class_valid_15, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_15, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_15, //  Data from FIFO transmit
+    input wire                               data_tx_valid_15, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_15, //  Start of Packet
+    input wire                               data_tx_eop_15, //  END of Packet
+    output wire                              data_tx_ready_15, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_15,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_15,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_15,               //  Xoff Pause frame generate 
-    input wire   xon_gen_15,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_15,          //  Enable Sleep Mode
-    output wire  magic_wakeup_15,           //  Wake Up Request
+    output wire                              tx_ff_uflow_15, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_15, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_15, //  Xoff Pause frame generate 
+    input wire                               xon_gen_15, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_15, //  Enable Sleep Mode
+    output wire                              magic_wakeup_15, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_15, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_15, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_15, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_15, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_15, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_15, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_15, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_15, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_15, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_15, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_15, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_15,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_15,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_15,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_15,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_15, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_15, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_15, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_15, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 16
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_16,                    //  Differential Receive Data 
-    output wire  txp_16,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_16,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_16,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_16,         //  Receiver Recovered Clock 
-    output wire  led_crs_16,                //  Carrier Sense
-    output wire  led_link_16,               //  Valid Link 
-    output wire  led_col_16,                //  Collision Indication
-    output wire  led_an_16,                 //  Auto-Negotiation Status
-    output wire  led_char_err_16,           //  Character Error
-    output wire  led_disp_err_16,           //  Disparity Error
+    input wire                               rxp_16, //  Differential Receive Data 
+    output wire                              txp_16, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_16, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_16, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_16, //  Receiver Recovered Clock 
+    output wire                              led_crs_16, //  Carrier Sense
+    output wire                              led_link_16, //  Valid Link 
+    output wire                              led_col_16, //  Collision Indication
+    output wire                              led_an_16, //  Auto-Negotiation Status
+    output wire                              led_char_err_16, //  Character Error
+    output wire                              led_disp_err_16, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_16,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_16,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_16,            //  Start of Packet
-    output wire  data_rx_eop_16,            //  End of Packet
-    output wire  [7:0] data_rx_data_16,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_16,    //  Receive packet error
-    output wire  data_rx_valid_16,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_16,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_16,   //  Frame Type Indication
-    output wire  pkt_class_valid_16,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_16,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_16,     //  Data from FIFO transmit
-    input wire   data_tx_valid_16,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_16,            //  Start of Packet
-    input wire   data_tx_eop_16,            //  END of Packet
-    output wire  data_tx_ready_16,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_16, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_16, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_16, //  Start of Packet
+    output wire                              data_rx_eop_16, //  End of Packet
+    output wire [7:0]                        data_rx_data_16, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_16, //  Receive packet error
+    output wire                              data_rx_valid_16, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_16, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_16, //  Frame Type Indication
+    output wire                              pkt_class_valid_16, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_16, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_16, //  Data from FIFO transmit
+    input wire                               data_tx_valid_16, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_16, //  Start of Packet
+    input wire                               data_tx_eop_16, //  END of Packet
+    output wire                              data_tx_ready_16, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_16,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_16,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_16,               //  Xoff Pause frame generate 
-    input wire   xon_gen_16,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_16,          //  Enable Sleep Mode
-    output wire  magic_wakeup_16,           //  Wake Up Request
+    output wire                              tx_ff_uflow_16, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_16, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_16, //  Xoff Pause frame generate 
+    input wire                               xon_gen_16, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_16, //  Enable Sleep Mode
+    output wire                              magic_wakeup_16, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_16, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_16, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_16, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_16, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_16, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_16, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_16, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_16, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_16, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_16, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_16, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_16,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_16,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_16,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_16,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_16, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_16, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_16, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_16, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 17
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_17,                    //  Differential Receive Data 
-    output wire  txp_17,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_17,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_17,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_17,         //  Receiver Recovered Clock 
-    output wire  led_crs_17,                //  Carrier Sense
-    output wire  led_link_17,               //  Valid Link 
-    output wire  led_col_17,                //  Collision Indication
-    output wire  led_an_17,                 //  Auto-Negotiation Status
-    output wire  led_char_err_17,           //  Character Error
-    output wire  led_disp_err_17,           //  Disparity Error
+    input wire                               rxp_17, //  Differential Receive Data 
+    output wire                              txp_17, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_17, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_17, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_17, //  Receiver Recovered Clock 
+    output wire                              led_crs_17, //  Carrier Sense
+    output wire                              led_link_17, //  Valid Link 
+    output wire                              led_col_17, //  Collision Indication
+    output wire                              led_an_17, //  Auto-Negotiation Status
+    output wire                              led_char_err_17, //  Character Error
+    output wire                              led_disp_err_17, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_17,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_17,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_17,            //  Start of Packet
-    output wire  data_rx_eop_17,            //  End of Packet
-    output wire  [7:0] data_rx_data_17,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_17,    //  Receive packet error
-    output wire  data_rx_valid_17,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_17,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_17,   //  Frame Type Indication
-    output wire  pkt_class_valid_17,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_17,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_17,     //  Data from FIFO transmit
-    input wire   data_tx_valid_17,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_17,            //  Start of Packet
-    input wire   data_tx_eop_17,            //  END of Packet
-    output wire  data_tx_ready_17,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_17, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_17, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_17, //  Start of Packet
+    output wire                              data_rx_eop_17, //  End of Packet
+    output wire [7:0]                        data_rx_data_17, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_17, //  Receive packet error
+    output wire                              data_rx_valid_17, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_17, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_17, //  Frame Type Indication
+    output wire                              pkt_class_valid_17, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_17, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_17, //  Data from FIFO transmit
+    input wire                               data_tx_valid_17, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_17, //  Start of Packet
+    input wire                               data_tx_eop_17, //  END of Packet
+    output wire                              data_tx_ready_17, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_17,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_17,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_17,               //  Xoff Pause frame generate 
-    input wire   xon_gen_17,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_17,          //  Enable Sleep Mode
-    output wire  magic_wakeup_17,           //  Wake Up Request
+    output wire                              tx_ff_uflow_17, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_17, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_17, //  Xoff Pause frame generate 
+    input wire                               xon_gen_17, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_17, //  Enable Sleep Mode
+    output wire                              magic_wakeup_17, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_17, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_17, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_17, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_17, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_17, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_17, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_17, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_17, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_17, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_17, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_17, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_17,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_17,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_17,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_17,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_17, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_17, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_17, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_17, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 18
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_18,                    //  Differential Receive Data 
-    output wire  txp_18,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_18,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_18,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_18,         //  Receiver Recovered Clock 
-    output wire  led_crs_18,                //  Carrier Sense
-    output wire  led_link_18,               //  Valid Link 
-    output wire  led_col_18,                //  Collision Indication
-    output wire  led_an_18,                 //  Auto-Negotiation Status
-    output wire  led_char_err_18,           //  Character Error
-    output wire  led_disp_err_18,           //  Disparity Error
+    input wire                               rxp_18, //  Differential Receive Data 
+    output wire                              txp_18, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_18, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_18, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_18, //  Receiver Recovered Clock 
+    output wire                              led_crs_18, //  Carrier Sense
+    output wire                              led_link_18, //  Valid Link 
+    output wire                              led_col_18, //  Collision Indication
+    output wire                              led_an_18, //  Auto-Negotiation Status
+    output wire                              led_char_err_18, //  Character Error
+    output wire                              led_disp_err_18, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_18,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_18,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_18,            //  Start of Packet
-    output wire  data_rx_eop_18,            //  End of Packet
-    output wire  [7:0] data_rx_data_18,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_18,    //  Receive packet error
-    output wire  data_rx_valid_18,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_18,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_18,   //  Frame Type Indication
-    output wire  pkt_class_valid_18,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_18,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_18,     //  Data from FIFO transmit
-    input wire   data_tx_valid_18,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_18,            //  Start of Packet
-    input wire   data_tx_eop_18,            //  END of Packet
-    output wire  data_tx_ready_18,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_18, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_18, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_18, //  Start of Packet
+    output wire                              data_rx_eop_18, //  End of Packet
+    output wire [7:0]                        data_rx_data_18, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_18, //  Receive packet error
+    output wire                              data_rx_valid_18, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_18, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_18, //  Frame Type Indication
+    output wire                              pkt_class_valid_18, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_18, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_18, //  Data from FIFO transmit
+    input wire                               data_tx_valid_18, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_18, //  Start of Packet
+    input wire                               data_tx_eop_18, //  END of Packet
+    output wire                              data_tx_ready_18, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_18,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_18,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_18,               //  Xoff Pause frame generate 
-    input wire   xon_gen_18,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_18,          //  Enable Sleep Mode
-    output wire  magic_wakeup_18,           //  Wake Up Request
+    output wire                              tx_ff_uflow_18, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_18, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_18, //  Xoff Pause frame generate 
+    input wire                               xon_gen_18, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_18, //  Enable Sleep Mode
+    output wire                              magic_wakeup_18, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_18, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_18, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_18, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_18, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_18, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_18, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_18, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_18, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_18, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_18, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_18, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_18,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_18,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_18,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_18,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_18, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_18, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_18, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_18, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 19
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_19,                    //  Differential Receive Data 
-    output wire  txp_19,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_19,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_19,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_19,         //  Receiver Recovered Clock 
-    output wire  led_crs_19,                //  Carrier Sense
-    output wire  led_link_19,               //  Valid Link 
-    output wire  led_col_19,                //  Collision Indication
-    output wire  led_an_19,                 //  Auto-Negotiation Status
-    output wire  led_char_err_19,           //  Character Error
-    output wire  led_disp_err_19,           //  Disparity Error
+    input wire                               rxp_19, //  Differential Receive Data 
+    output wire                              txp_19, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_19, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_19, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_19, //  Receiver Recovered Clock 
+    output wire                              led_crs_19, //  Carrier Sense
+    output wire                              led_link_19, //  Valid Link 
+    output wire                              led_col_19, //  Collision Indication
+    output wire                              led_an_19, //  Auto-Negotiation Status
+    output wire                              led_char_err_19, //  Character Error
+    output wire                              led_disp_err_19, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_19,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_19,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_19,            //  Start of Packet
-    output wire  data_rx_eop_19,            //  End of Packet
-    output wire  [7:0] data_rx_data_19,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_19,    //  Receive packet error
-    output wire  data_rx_valid_19,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_19,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_19,   //  Frame Type Indication
-    output wire  pkt_class_valid_19,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_19,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_19,     //  Data from FIFO transmit
-    input wire   data_tx_valid_19,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_19,            //  Start of Packet
-    input wire   data_tx_eop_19,            //  END of Packet
-    output wire  data_tx_ready_19,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_19, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_19, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_19, //  Start of Packet
+    output wire                              data_rx_eop_19, //  End of Packet
+    output wire [7:0]                        data_rx_data_19, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_19, //  Receive packet error
+    output wire                              data_rx_valid_19, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_19, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_19, //  Frame Type Indication
+    output wire                              pkt_class_valid_19, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_19, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_19, //  Data from FIFO transmit
+    input wire                               data_tx_valid_19, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_19, //  Start of Packet
+    input wire                               data_tx_eop_19, //  END of Packet
+    output wire                              data_tx_ready_19, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_19,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_19,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_19,               //  Xoff Pause frame generate 
-    input wire   xon_gen_19,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_19,          //  Enable Sleep Mode
-    output wire  magic_wakeup_19,           //  Wake Up Request
+    output wire                              tx_ff_uflow_19, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_19, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_19, //  Xoff Pause frame generate 
+    input wire                               xon_gen_19, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_19, //  Enable Sleep Mode
+    output wire                              magic_wakeup_19, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_19, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_19, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_19, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_19, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_19, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_19, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_19, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_19, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_19, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_19, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_19, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_19,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_19,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_19,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_19,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_19, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_19, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_19, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_19, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 20
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_20,                    //  Differential Receive Data 
-    output wire  txp_20,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_20,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_20,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_20,         //  Receiver Recovered Clock 
-    output wire  led_crs_20,                //  Carrier Sense
-    output wire  led_link_20,               //  Valid Link 
-    output wire  led_col_20,                //  Collision Indication
-    output wire  led_an_20,                 //  Auto-Negotiation Status
-    output wire  led_char_err_20,           //  Character Error
-    output wire  led_disp_err_20,           //  Disparity Error
+    input wire                               rxp_20, //  Differential Receive Data 
+    output wire                              txp_20, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_20, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_20, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_20, //  Receiver Recovered Clock 
+    output wire                              led_crs_20, //  Carrier Sense
+    output wire                              led_link_20, //  Valid Link 
+    output wire                              led_col_20, //  Collision Indication
+    output wire                              led_an_20, //  Auto-Negotiation Status
+    output wire                              led_char_err_20, //  Character Error
+    output wire                              led_disp_err_20, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_20,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_20,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_20,            //  Start of Packet
-    output wire  data_rx_eop_20,            //  End of Packet
-    output wire  [7:0] data_rx_data_20,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_20,    //  Receive packet error
-    output wire  data_rx_valid_20,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_20,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_20,   //  Frame Type Indication
-    output wire  pkt_class_valid_20,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_20,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_20,     //  Data from FIFO transmit
-    input wire   data_tx_valid_20,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_20,            //  Start of Packet
-    input wire   data_tx_eop_20,            //  END of Packet
-    output wire  data_tx_ready_20,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_20, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_20, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_20, //  Start of Packet
+    output wire                              data_rx_eop_20, //  End of Packet
+    output wire [7:0]                        data_rx_data_20, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_20, //  Receive packet error
+    output wire                              data_rx_valid_20, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_20, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_20, //  Frame Type Indication
+    output wire                              pkt_class_valid_20, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_20, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_20, //  Data from FIFO transmit
+    input wire                               data_tx_valid_20, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_20, //  Start of Packet
+    input wire                               data_tx_eop_20, //  END of Packet
+    output wire                              data_tx_ready_20, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_20,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_20,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_20,               //  Xoff Pause frame generate 
-    input wire   xon_gen_20,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_20,          //  Enable Sleep Mode
-    output wire  magic_wakeup_20,           //  Wake Up Request
+    output wire                              tx_ff_uflow_20, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_20, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_20, //  Xoff Pause frame generate 
+    input wire                               xon_gen_20, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_20, //  Enable Sleep Mode
+    output wire                              magic_wakeup_20, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_20, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_20, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_20, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_20, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_20, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_20, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_20, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_20, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_20, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_20, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_20, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_20,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_20,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_20,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_20,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_20, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_20, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_20, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_20, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 21
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_21,                    //  Differential Receive Data 
-    output wire  txp_21,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_21,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_21,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_21,         //  Receiver Recovered Clock 
-    output wire  led_crs_21,                //  Carrier Sense
-    output wire  led_link_21,               //  Valid Link 
-    output wire  led_col_21,                //  Collision Indication
-    output wire  led_an_21,                 //  Auto-Negotiation Status
-    output wire  led_char_err_21,           //  Character Error
-    output wire  led_disp_err_21,           //  Disparity Error
+    input wire                               rxp_21, //  Differential Receive Data 
+    output wire                              txp_21, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_21, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_21, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_21, //  Receiver Recovered Clock 
+    output wire                              led_crs_21, //  Carrier Sense
+    output wire                              led_link_21, //  Valid Link 
+    output wire                              led_col_21, //  Collision Indication
+    output wire                              led_an_21, //  Auto-Negotiation Status
+    output wire                              led_char_err_21, //  Character Error
+    output wire                              led_disp_err_21, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_21,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_21,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_21,            //  Start of Packet
-    output wire  data_rx_eop_21,            //  End of Packet
-    output wire  [7:0] data_rx_data_21,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_21,    //  Receive packet error
-    output wire  data_rx_valid_21,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_21,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_21,   //  Frame Type Indication
-    output wire  pkt_class_valid_21,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_21,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_21,     //  Data from FIFO transmit
-    input wire   data_tx_valid_21,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_21,            //  Start of Packet
-    input wire   data_tx_eop_21,            //  END of Packet
-    output wire  data_tx_ready_21,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_21, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_21, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_21, //  Start of Packet
+    output wire                              data_rx_eop_21, //  End of Packet
+    output wire [7:0]                        data_rx_data_21, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_21, //  Receive packet error
+    output wire                              data_rx_valid_21, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_21, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_21, //  Frame Type Indication
+    output wire                              pkt_class_valid_21, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_21, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_21, //  Data from FIFO transmit
+    input wire                               data_tx_valid_21, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_21, //  Start of Packet
+    input wire                               data_tx_eop_21, //  END of Packet
+    output wire                              data_tx_ready_21, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_21,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_21,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_21,               //  Xoff Pause frame generate 
-    input wire   xon_gen_21,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_21,          //  Enable Sleep Mode
-    output wire  magic_wakeup_21,           //  Wake Up Request
+    output wire                              tx_ff_uflow_21, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_21, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_21, //  Xoff Pause frame generate 
+    input wire                               xon_gen_21, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_21, //  Enable Sleep Mode
+    output wire                              magic_wakeup_21, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_21, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_21, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_21, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_21, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_21, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_21, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_21, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_21, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_21, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_21, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_21, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_21,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_21,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_21,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_21,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_21, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_21, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_21, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_21, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 22
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_22,                    //  Differential Receive Data 
-    output wire  txp_22,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_22,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_22,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_22,         //  Receiver Recovered Clock 
-    output wire  led_crs_22,                //  Carrier Sense
-    output wire  led_link_22,               //  Valid Link 
-    output wire  led_col_22,                //  Collision Indication
-    output wire  led_an_22,                 //  Auto-Negotiation Status
-    output wire  led_char_err_22,           //  Character Error
-    output wire  led_disp_err_22,           //  Disparity Error
+    input wire                               rxp_22, //  Differential Receive Data 
+    output wire                              txp_22, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_22, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_22, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_22, //  Receiver Recovered Clock 
+    output wire                              led_crs_22, //  Carrier Sense
+    output wire                              led_link_22, //  Valid Link 
+    output wire                              led_col_22, //  Collision Indication
+    output wire                              led_an_22, //  Auto-Negotiation Status
+    output wire                              led_char_err_22, //  Character Error
+    output wire                              led_disp_err_22, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_22,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_22,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_22,            //  Start of Packet
-    output wire  data_rx_eop_22,            //  End of Packet
-    output wire  [7:0] data_rx_data_22,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_22,    //  Receive packet error
-    output wire  data_rx_valid_22,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_22,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_22,   //  Frame Type Indication
-    output wire  pkt_class_valid_22,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_22,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_22,     //  Data from FIFO transmit
-    input wire   data_tx_valid_22,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_22,            //  Start of Packet
-    input wire   data_tx_eop_22,            //  END of Packet
-    output wire  data_tx_ready_22,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_22, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_22, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_22, //  Start of Packet
+    output wire                              data_rx_eop_22, //  End of Packet
+    output wire [7:0]                        data_rx_data_22, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_22, //  Receive packet error
+    output wire                              data_rx_valid_22, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_22, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_22, //  Frame Type Indication
+    output wire                              pkt_class_valid_22, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_22, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_22, //  Data from FIFO transmit
+    input wire                               data_tx_valid_22, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_22, //  Start of Packet
+    input wire                               data_tx_eop_22, //  END of Packet
+    output wire                              data_tx_ready_22, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_22,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_22,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_22,               //  Xoff Pause frame generate 
-    input wire   xon_gen_22,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_22,          //  Enable Sleep Mode
-    output wire  magic_wakeup_22,           //  Wake Up Request
+    output wire                              tx_ff_uflow_22, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_22, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_22, //  Xoff Pause frame generate 
+    input wire                               xon_gen_22, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_22, //  Enable Sleep Mode
+    output wire                              magic_wakeup_22, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_22, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_22, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_22, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_22, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_22, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_22, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_22, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_22, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_22, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_22, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_22, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_22,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_22,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_22,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_22,  //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_22, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_22, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_22, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_22, //  Signals from the gxb block to the reconfig block
 
 
     // CHANNEL 23
 
     // PCS SIGNALS TO PHY
-    input wire   rxp_23,                    //  Differential Receive Data 
-    output wire  txp_23,                    //  Differential Transmit Data 
-    input wire   gxb_pwrdn_in_23,           //  Powerdown signal to GXB
-    output wire  pcs_pwrdn_out_23,          //  Powerdown Enable from PCS
-    output wire  rx_recovclkout_23,         //  Receiver Recovered Clock 
-    output wire  led_crs_23,                //  Carrier Sense
-    output wire  led_link_23,               //  Valid Link 
-    output wire  led_col_23,                //  Collision Indication
-    output wire  led_an_23,                 //  Auto-Negotiation Status
-    output wire  led_char_err_23,           //  Character Error
-    output wire  led_disp_err_23,           //  Disparity Error
+    input wire                               rxp_23, //  Differential Receive Data 
+    output wire                              txp_23, //  Differential Transmit Data 
+    input wire                               gxb_pwrdn_in_23, //  Powerdown signal to GXB
+    output wire                              pcs_pwrdn_out_23, //  Powerdown Enable from PCS
+    output wire                              rx_recovclkout_23, //  Receiver Recovered Clock 
+    output wire                              led_crs_23, //  Carrier Sense
+    output wire                              led_link_23, //  Valid Link 
+    output wire                              led_col_23, //  Collision Indication
+    output wire                              led_an_23, //  Auto-Negotiation Status
+    output wire                              led_char_err_23, //  Character Error
+    output wire                              led_disp_err_23, //  Disparity Error
 
     // AV-ST TX & RX
-    output wire  mac_rx_clk_23,             //  Av-ST Receive Clock
-    output wire  mac_tx_clk_23,             //  Av-ST Transmit Clock   
-    output wire  data_rx_sop_23,            //  Start of Packet
-    output wire  data_rx_eop_23,            //  End of Packet
-    output wire  [7:0] data_rx_data_23,     //  Data from FIFO
-    output wire  [4:0] data_rx_error_23,    //  Receive packet error
-    output wire  data_rx_valid_23,          //  Data Receive FIFO Valid
-    input wire   data_rx_ready_23,          //  Data Receive Ready
-    output wire  [4:0] pkt_class_data_23,   //  Frame Type Indication
-    output wire  pkt_class_valid_23,        //  Frame Type Indication Valid 
-    input wire   data_tx_error_23,          //  STATUS FIFO (Tx frame Error from Apps)
-    input wire   [7:0] data_tx_data_23,     //  Data from FIFO transmit
-    input wire   data_tx_valid_23,          //  Data FIFO transmit Empty
-    input wire   data_tx_sop_23,            //  Start of Packet
-    input wire   data_tx_eop_23,            //  END of Packet
-    output wire  data_tx_ready_23,          //  Data FIFO transmit Read Enable 	
+    output wire                              mac_rx_clk_23, //  Av-ST Receive Clock
+    output wire                              mac_tx_clk_23, //  Av-ST Transmit Clock   
+    output wire                              data_rx_sop_23, //  Start of Packet
+    output wire                              data_rx_eop_23, //  End of Packet
+    output wire [7:0]                        data_rx_data_23, //  Data from FIFO
+    output wire [4:0]                        data_rx_error_23, //  Receive packet error
+    output wire                              data_rx_valid_23, //  Data Receive FIFO Valid
+    input wire                               data_rx_ready_23, //  Data Receive Ready
+    output wire [4:0]                        pkt_class_data_23, //  Frame Type Indication
+    output wire                              pkt_class_valid_23, //  Frame Type Indication Valid 
+    input wire                               data_tx_error_23, //  STATUS FIFO (Tx frame Error from Apps)
+    input wire [7:0]                         data_tx_data_23, //  Data from FIFO transmit
+    input wire                               data_tx_valid_23, //  Data FIFO transmit Empty
+    input wire                               data_tx_sop_23, //  Start of Packet
+    input wire                               data_tx_eop_23, //  END of Packet
+    output wire                              data_tx_ready_23, //  Data FIFO transmit Read Enable       
 
     // STAND_ALONE CONDUITS 
-    output wire  tx_ff_uflow_23,            //  TX FIFO underflow occured (Synchronous with tx_clk)
-    input wire   tx_crc_fwd_23,             //  Forward Current Frame with CRC from Application
-    input wire   xoff_gen_23,               //  Xoff Pause frame generate 
-    input wire   xon_gen_23,                //  Xon Pause frame generate 
-    input wire   magic_sleep_n_23,          //  Enable Sleep Mode
-    output wire  magic_wakeup_23,           //  Wake Up Request
+    output wire                              tx_ff_uflow_23, //  TX FIFO underflow occured (Synchronous with tx_clk)
+    input wire                               tx_crc_fwd_23, //  Forward Current Frame with CRC from Application
+    input wire                               xoff_gen_23, //  Xoff Pause frame generate 
+    input wire                               xon_gen_23, //  Xon Pause frame generate 
+    input wire                               magic_sleep_n_23, //  Enable Sleep Mode
+    output wire                              magic_wakeup_23, //  Wake Up Request
+    
+// IEEE1588's code
+    input wire                               tx_egress_timestamp_request_valid_23, //    Timestamp request valid from user
+    input wire [(TSTAMP_FP_WIDTH)-1:0]       tx_egress_timestamp_request_data_23, //    Fingerprint associated to the timestamp request
+    input wire                               tx_egress_timestamp_insert_valid_23, //    Timestamp insert in 1 step clock
+    output wire                              tx_egress_timestamp_valid_23, //    Timestamp + fingerprint from TSU
+    output wire [(96 + TSTAMP_FP_WIDTH)-1:0] tx_egress_timestamp_data_23, //    Timestamp + fingerprint from TSU
+    input wire [96-1:0]                      tx_time_of_day_data_23, //    Time of Day
+    input wire                               tx_ingress_timestamp_valid_23, //    Timestamp to TSU
+    input wire [(96)-1:0]                    tx_ingress_timestamp_data_23, //    Timestamp to TSU
+    output wire                              rx_ingress_timestamp_valid_23, //    RX timestamp valid
+    output wire [(96)-1:0]                   rx_ingress_timestamp_data_23, //    RX timestamp data
+    input wire [96-1:0]                      rx_time_of_day_data_23, //    Time of Day
 
     // RECONFIG BLOCK SIGNALS
-    input wire   reconfig_clk_23,             //  Clock for reconfiguration block
-    input wire   reconfig_busy_23,                     //  Busy from reconfiguration block
-    input wire   [3:0] reconfig_togxb_23,     //  Signals from the reconfig block to the GXB block
-    output wire  [16:0] reconfig_fromgxb_23); //  Signals from the gxb block to the reconfig block
+    input wire                               reconfig_clk_23, //  Clock for reconfiguration block
+    input wire                               reconfig_busy_23, //  Busy from reconfiguration block
+    input wire [3:0]                         reconfig_togxb_23, //  Signals from the reconfig block to the GXB block
+    output wire [16:0]                       reconfig_fromgxb_23); //  Signals from the gxb block to the reconfig block
 
 
 
@@ -1555,7 +1874,7 @@ wire pll_powerdown_sqcnr_22,tx_digitalreset_sqcnr_22,rx_analogreset_sqcnr_22,rx_
 wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_digitalreset_sqcnr_23,gxb_powerdown_sqcnr_23,pll_locked_23,rx_freqlocked_23;
 
       // Assign pcs clock for all channels
-	//assign pcs_clk = {pcs_clk_c23,pcs_clk_c22,pcs_clk_c21,pcs_clk_c20,pcs_clk_c19,pcs_clk_c18,pcs_clk_c17,pcs_clk_c16,pcs_clk_c15,pcs_clk_c14,pcs_clk_c13,pcs_clk_c12,pcs_clk_c11,pcs_clk_c10,pcs_clk_c9,pcs_clk_c8,pcs_clk_c7,pcs_clk_c6,pcs_clk_c5,pcs_clk_c4,pcs_clk_c3,pcs_clk_c2,pcs_clk_c1,pcs_clk_c0};
+        //assign pcs_clk = {pcs_clk_c23,pcs_clk_c22,pcs_clk_c21,pcs_clk_c20,pcs_clk_c19,pcs_clk_c18,pcs_clk_c17,pcs_clk_c16,pcs_clk_c15,pcs_clk_c14,pcs_clk_c13,pcs_clk_c12,pcs_clk_c11,pcs_clk_c10,pcs_clk_c9,pcs_clk_c8,pcs_clk_c7,pcs_clk_c6,pcs_clk_c5,pcs_clk_c4,pcs_clk_c3,pcs_clk_c2,pcs_clk_c1,pcs_clk_c0};
 
     //  Assign the character error and link status to top level leds
     //  ------------------------------------------------------------
@@ -1608,23 +1927,46 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
     assign led_char_err_23 = led_char_err_gx[23];
     assign led_link_23 = link_status[23];
 
-    //Resets the Reset Sequencer for the rising edge of Reset signal
-    // ---------------------------------------------------------------
-    reg reset_p1, reset_p2;
-    reg reset_posedge;
-    always@(posedge clk)
-    begin
-        reset_p1 <= reset;
-        reset_p2 <= reset_p1;
-        reset_posedge <= reset_p1 & ~reset_p2;
+    // Based on PHYIP , when user assert reset - it hold the reset sequencer block in reset.
+    //                , reset sequencing only start then reset_sequnece end.
+    wire reset_sync;
+    reg reset_start;
+
+    altera_tse_reset_synchronizer reset_sync_u0 (
+        .clk(clk),
+        .reset_in(reset),
+        .reset_out(reset_sync)
+        );
+
+    always@(posedge clk or posedge reset_sync) begin
+        if (reset_sync) begin
+            reset_start <= 1'b1;
+        end
+        else begin
+            reset_start <= 1'b0;
+        end
     end
+
+   wire pcs_phase_measure_clk_w;
+   
+   generate 
+      if (ENABLE_TIMESTAMPING == 0)
+        begin
+           assign pcs_phase_measure_clk_w = 1'b0;
+        end
+      else 
+        begin
+           assign pcs_phase_measure_clk_w = pcs_phase_measure_clk;
+        end
+   endgenerate
+   
 
     // Instantiation of the MAC_PCS core that connects to a PMA
     // --------------------------------------------------------
 
     altera_tse_top_multi_mac_pcs_gige U_MULTI_MAC_PCS(
 
-        .reset(reset),                    //INPUT  : ASYNCHRONOUS RESET - clk DOMAIN
+        .reset(reset),                            //INPUT  : ASYNCHRONOUS RESET - clk DOMAIN
         .clk(clk),                                //INPUT  : CLOCK
         .read(read),                              //INPUT  : REGISTER READ TRANSACTION
         .ref_clk(ref_clk),                        //INPUT  : REFERENCE CLOCK 
@@ -1639,11 +1981,12 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .mdio_oen(mdio_oen),                      //OUTPUT : MDIO Output Enable
         .mac_rx_clk(mac_rx_clk),                  //OUTPUT : Av-ST Rx Clock
         .mac_tx_clk(mac_tx_clk),                  //OUTPUT : Av-ST Tx Clock
-	    .rx_afull_clk(rx_afull_clk),              //INPUT  : AFull Status Clock
-	    .rx_afull_data(rx_afull_data),            //INPUT  : AFull Status Data
-	    .rx_afull_valid(rx_afull_valid),          //INPUT  : AFull Status Valid
-	    .rx_afull_channel(rx_afull_channel),      //INPUT  : AFull Status Channel
-
+            .rx_afull_clk(rx_afull_clk),              //INPUT  : AFull Status Clock
+            .rx_afull_data(rx_afull_data),            //INPUT  : AFull Status Data
+            .rx_afull_valid(rx_afull_valid),          //INPUT  : AFull Status Valid
+            .rx_afull_channel(rx_afull_channel),      //INPUT  : AFull Status Channel
+         .pcs_phase_measure_clk(pcs_phase_measure_clk_w),
+                                                      
          // Channel 0 
             
 
@@ -1682,6 +2025,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_0(data_tx_ready_0),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_0(tx_ff_uflow_0),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_0(tx_crc_fwd_0),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_0(tx_egress_timestamp_request_valid_0),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_0(tx_egress_timestamp_request_data_0),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_0(tx_egress_timestamp_valid_0),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_0(tx_egress_timestamp_data_0),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_0(tx_time_of_day_data_0),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_0(tx_ingress_timestamp_valid_0),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_0(tx_ingress_timestamp_data_0),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_0(rx_ingress_timestamp_valid_0),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_0(rx_ingress_timestamp_data_0),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_0(rx_time_of_day_data_0),                                //INPUT  : Time of Day
         .xoff_gen_0(xoff_gen_0),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_0(xon_gen_0),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_0(magic_sleep_n_0),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -1725,6 +2079,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_1(data_tx_ready_1),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_1(tx_ff_uflow_1),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_1(tx_crc_fwd_1),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_1(tx_egress_timestamp_request_valid_1),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_1(tx_egress_timestamp_request_data_1),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_1(tx_egress_timestamp_valid_1),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_1(tx_egress_timestamp_data_1),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_1(tx_time_of_day_data_1),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_1(tx_ingress_timestamp_valid_1),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_1(tx_ingress_timestamp_data_1),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_1(rx_ingress_timestamp_valid_1),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_1(rx_ingress_timestamp_data_1),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_1(rx_time_of_day_data_1),                                //INPUT  : Time of Day
         .xoff_gen_1(xoff_gen_1),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_1(xon_gen_1),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_1(magic_sleep_n_1),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -1768,6 +2133,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_2(data_tx_ready_2),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_2(tx_ff_uflow_2),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_2(tx_crc_fwd_2),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_2(tx_egress_timestamp_request_valid_2),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_2(tx_egress_timestamp_request_data_2),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_2(tx_egress_timestamp_valid_2),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_2(tx_egress_timestamp_data_2),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_2(tx_time_of_day_data_2),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_2(tx_ingress_timestamp_valid_2),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_2(tx_ingress_timestamp_data_2),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_2(rx_ingress_timestamp_valid_2),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_2(rx_ingress_timestamp_data_2),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_2(rx_time_of_day_data_2),                                //INPUT  : Time of Day
         .xoff_gen_2(xoff_gen_2),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_2(xon_gen_2),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_2(magic_sleep_n_2),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -1811,6 +2187,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_3(data_tx_ready_3),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_3(tx_ff_uflow_3),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_3(tx_crc_fwd_3),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_3(tx_egress_timestamp_request_valid_3),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_3(tx_egress_timestamp_request_data_3),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_3(tx_egress_timestamp_valid_3),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_3(tx_egress_timestamp_data_3),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_3(tx_time_of_day_data_3),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_3(tx_ingress_timestamp_valid_3),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_3(tx_ingress_timestamp_data_3),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_3(rx_ingress_timestamp_valid_3),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_3(rx_ingress_timestamp_data_3),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_3(rx_time_of_day_data_3),                                //INPUT  : Time of Day
         .xoff_gen_3(xoff_gen_3),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_3(xon_gen_3),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_3(magic_sleep_n_3),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -1854,6 +2241,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_4(data_tx_ready_4),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_4(tx_ff_uflow_4),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_4(tx_crc_fwd_4),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_4(tx_egress_timestamp_request_valid_4),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_4(tx_egress_timestamp_request_data_4),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_4(tx_egress_timestamp_valid_4),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_4(tx_egress_timestamp_data_4),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_4(tx_time_of_day_data_4),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_4(tx_ingress_timestamp_valid_4),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_4(tx_ingress_timestamp_data_4),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_4(rx_ingress_timestamp_valid_4),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_4(rx_ingress_timestamp_data_4),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_4(rx_time_of_day_data_4),                                //INPUT  : Time of Day
         .xoff_gen_4(xoff_gen_4),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_4(xon_gen_4),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_4(magic_sleep_n_4),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -1897,6 +2295,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_5(data_tx_ready_5),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_5(tx_ff_uflow_5),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_5(tx_crc_fwd_5),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_5(tx_egress_timestamp_request_valid_5),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_5(tx_egress_timestamp_request_data_5),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_5(tx_egress_timestamp_valid_5),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_5(tx_egress_timestamp_data_5),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_5(tx_time_of_day_data_5),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_5(tx_ingress_timestamp_valid_5),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_5(tx_ingress_timestamp_data_5),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_5(rx_ingress_timestamp_valid_5),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_5(rx_ingress_timestamp_data_5),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_5(rx_time_of_day_data_5),                                //INPUT  : Time of Day
         .xoff_gen_5(xoff_gen_5),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_5(xon_gen_5),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_5(magic_sleep_n_5),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -1940,6 +2349,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_6(data_tx_ready_6),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_6(tx_ff_uflow_6),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_6(tx_crc_fwd_6),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_6(tx_egress_timestamp_request_valid_6),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_6(tx_egress_timestamp_request_data_6),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_6(tx_egress_timestamp_valid_6),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_6(tx_egress_timestamp_data_6),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_6(tx_time_of_day_data_6),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_6(tx_ingress_timestamp_valid_6),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_6(tx_ingress_timestamp_data_6),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_6(rx_ingress_timestamp_valid_6),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_6(rx_ingress_timestamp_data_6),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_6(rx_time_of_day_data_6),                                //INPUT  : Time of Day
         .xoff_gen_6(xoff_gen_6),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_6(xon_gen_6),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_6(magic_sleep_n_6),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -1983,6 +2403,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_7(data_tx_ready_7),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_7(tx_ff_uflow_7),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_7(tx_crc_fwd_7),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_7(tx_egress_timestamp_request_valid_7),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_7(tx_egress_timestamp_request_data_7),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_7(tx_egress_timestamp_valid_7),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_7(tx_egress_timestamp_data_7),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_7(tx_time_of_day_data_7),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_7(tx_ingress_timestamp_valid_7),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_7(tx_ingress_timestamp_data_7),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_7(rx_ingress_timestamp_valid_7),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_7(rx_ingress_timestamp_data_7),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_7(rx_time_of_day_data_7),                                //INPUT  : Time of Day
         .xoff_gen_7(xoff_gen_7),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_7(xon_gen_7),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_7(magic_sleep_n_7),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2026,6 +2457,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_8(data_tx_ready_8),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_8(tx_ff_uflow_8),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_8(tx_crc_fwd_8),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_8(tx_egress_timestamp_request_valid_8),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_8(tx_egress_timestamp_request_data_8),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_8(tx_egress_timestamp_valid_8),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_8(tx_egress_timestamp_data_8),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_8(tx_time_of_day_data_8),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_8(tx_ingress_timestamp_valid_8),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_8(tx_ingress_timestamp_data_8),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_8(rx_ingress_timestamp_valid_8),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_8(rx_ingress_timestamp_data_8),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_8(rx_time_of_day_data_8),                                //INPUT  : Time of Day
         .xoff_gen_8(xoff_gen_8),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_8(xon_gen_8),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_8(magic_sleep_n_8),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2069,6 +2511,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_9(data_tx_ready_9),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_9(tx_ff_uflow_9),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_9(tx_crc_fwd_9),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_9(tx_egress_timestamp_request_valid_9),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_9(tx_egress_timestamp_request_data_9),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_9(tx_egress_timestamp_valid_9),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_9(tx_egress_timestamp_data_9),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_9(tx_time_of_day_data_9),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_9(tx_ingress_timestamp_valid_9),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_9(tx_ingress_timestamp_data_9),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_9(rx_ingress_timestamp_valid_9),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_9(rx_ingress_timestamp_data_9),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_9(rx_time_of_day_data_9),                                //INPUT  : Time of Day
         .xoff_gen_9(xoff_gen_9),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_9(xon_gen_9),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_9(magic_sleep_n_9),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2112,6 +2565,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_10(data_tx_ready_10),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_10(tx_ff_uflow_10),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_10(tx_crc_fwd_10),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_10(tx_egress_timestamp_request_valid_10),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_10(tx_egress_timestamp_request_data_10),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_10(tx_egress_timestamp_valid_10),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_10(tx_egress_timestamp_data_10),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_10(tx_time_of_day_data_10),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_10(tx_ingress_timestamp_valid_10),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_10(tx_ingress_timestamp_data_10),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_10(rx_ingress_timestamp_valid_10),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_10(rx_ingress_timestamp_data_10),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_10(rx_time_of_day_data_10),                                //INPUT  : Time of Day
         .xoff_gen_10(xoff_gen_10),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_10(xon_gen_10),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_10(magic_sleep_n_10),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2155,6 +2619,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_11(data_tx_ready_11),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_11(tx_ff_uflow_11),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_11(tx_crc_fwd_11),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_11(tx_egress_timestamp_request_valid_11),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_11(tx_egress_timestamp_request_data_11),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_11(tx_egress_timestamp_valid_11),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_11(tx_egress_timestamp_data_11),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_11(tx_time_of_day_data_11),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_11(tx_ingress_timestamp_valid_11),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_11(tx_ingress_timestamp_data_11),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_11(rx_ingress_timestamp_valid_11),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_11(rx_ingress_timestamp_data_11),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_11(rx_time_of_day_data_11),                                //INPUT  : Time of Day
         .xoff_gen_11(xoff_gen_11),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_11(xon_gen_11),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_11(magic_sleep_n_11),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2198,6 +2673,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_12(data_tx_ready_12),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_12(tx_ff_uflow_12),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_12(tx_crc_fwd_12),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_12(tx_egress_timestamp_request_valid_12),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_12(tx_egress_timestamp_request_data_12),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_12(tx_egress_timestamp_valid_12),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_12(tx_egress_timestamp_data_12),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_12(tx_time_of_day_data_12),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_12(tx_ingress_timestamp_valid_12),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_12(tx_ingress_timestamp_data_12),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_12(rx_ingress_timestamp_valid_12),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_12(rx_ingress_timestamp_data_12),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_12(rx_time_of_day_data_12),                                //INPUT  : Time of Day
         .xoff_gen_12(xoff_gen_12),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_12(xon_gen_12),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_12(magic_sleep_n_12),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2241,6 +2727,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_13(data_tx_ready_13),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_13(tx_ff_uflow_13),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_13(tx_crc_fwd_13),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_13(tx_egress_timestamp_request_valid_13),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_13(tx_egress_timestamp_request_data_13),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_13(tx_egress_timestamp_valid_13),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_13(tx_egress_timestamp_data_13),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_13(tx_time_of_day_data_13),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_13(tx_ingress_timestamp_valid_13),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_13(tx_ingress_timestamp_data_13),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_13(rx_ingress_timestamp_valid_13),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_13(rx_ingress_timestamp_data_13),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_13(rx_time_of_day_data_13),                                //INPUT  : Time of Day
         .xoff_gen_13(xoff_gen_13),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_13(xon_gen_13),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_13(magic_sleep_n_13),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2284,6 +2781,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_14(data_tx_ready_14),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_14(tx_ff_uflow_14),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_14(tx_crc_fwd_14),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_14(tx_egress_timestamp_request_valid_14),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_14(tx_egress_timestamp_request_data_14),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_14(tx_egress_timestamp_valid_14),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_14(tx_egress_timestamp_data_14),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_14(tx_time_of_day_data_14),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_14(tx_ingress_timestamp_valid_14),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_14(tx_ingress_timestamp_data_14),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_14(rx_ingress_timestamp_valid_14),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_14(rx_ingress_timestamp_data_14),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_14(rx_time_of_day_data_14),                                //INPUT  : Time of Day
         .xoff_gen_14(xoff_gen_14),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_14(xon_gen_14),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_14(magic_sleep_n_14),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2327,6 +2835,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_15(data_tx_ready_15),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_15(tx_ff_uflow_15),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_15(tx_crc_fwd_15),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_15(tx_egress_timestamp_request_valid_15),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_15(tx_egress_timestamp_request_data_15),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_15(tx_egress_timestamp_valid_15),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_15(tx_egress_timestamp_data_15),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_15(tx_time_of_day_data_15),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_15(tx_ingress_timestamp_valid_15),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_15(tx_ingress_timestamp_data_15),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_15(rx_ingress_timestamp_valid_15),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_15(rx_ingress_timestamp_data_15),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_15(rx_time_of_day_data_15),                                //INPUT  : Time of Day
         .xoff_gen_15(xoff_gen_15),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_15(xon_gen_15),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_15(magic_sleep_n_15),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2370,6 +2889,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_16(data_tx_ready_16),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_16(tx_ff_uflow_16),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_16(tx_crc_fwd_16),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_16(tx_egress_timestamp_request_valid_16),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_16(tx_egress_timestamp_request_data_16),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_16(tx_egress_timestamp_valid_16),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_16(tx_egress_timestamp_data_16),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_16(tx_time_of_day_data_16),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_16(tx_ingress_timestamp_valid_16),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_16(tx_ingress_timestamp_data_16),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_16(rx_ingress_timestamp_valid_16),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_16(rx_ingress_timestamp_data_16),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_16(rx_time_of_day_data_16),                                //INPUT  : Time of Day
         .xoff_gen_16(xoff_gen_16),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_16(xon_gen_16),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_16(magic_sleep_n_16),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2413,6 +2943,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_17(data_tx_ready_17),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_17(tx_ff_uflow_17),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_17(tx_crc_fwd_17),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_17(tx_egress_timestamp_request_valid_17),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_17(tx_egress_timestamp_request_data_17),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_17(tx_egress_timestamp_valid_17),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_17(tx_egress_timestamp_data_17),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_17(tx_time_of_day_data_17),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_17(tx_ingress_timestamp_valid_17),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_17(tx_ingress_timestamp_data_17),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_17(rx_ingress_timestamp_valid_17),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_17(rx_ingress_timestamp_data_17),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_17(rx_time_of_day_data_17),                                //INPUT  : Time of Day
         .xoff_gen_17(xoff_gen_17),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_17(xon_gen_17),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_17(magic_sleep_n_17),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2456,6 +2997,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_18(data_tx_ready_18),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_18(tx_ff_uflow_18),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_18(tx_crc_fwd_18),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_18(tx_egress_timestamp_request_valid_18),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_18(tx_egress_timestamp_request_data_18),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_18(tx_egress_timestamp_valid_18),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_18(tx_egress_timestamp_data_18),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_18(tx_time_of_day_data_18),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_18(tx_ingress_timestamp_valid_18),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_18(tx_ingress_timestamp_data_18),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_18(rx_ingress_timestamp_valid_18),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_18(rx_ingress_timestamp_data_18),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_18(rx_time_of_day_data_18),                                //INPUT  : Time of Day
         .xoff_gen_18(xoff_gen_18),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_18(xon_gen_18),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_18(magic_sleep_n_18),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2499,6 +3051,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_19(data_tx_ready_19),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_19(tx_ff_uflow_19),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_19(tx_crc_fwd_19),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_19(tx_egress_timestamp_request_valid_19),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_19(tx_egress_timestamp_request_data_19),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_19(tx_egress_timestamp_valid_19),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_19(tx_egress_timestamp_data_19),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_19(tx_time_of_day_data_19),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_19(tx_ingress_timestamp_valid_19),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_19(tx_ingress_timestamp_data_19),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_19(rx_ingress_timestamp_valid_19),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_19(rx_ingress_timestamp_data_19),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_19(rx_time_of_day_data_19),                                //INPUT  : Time of Day
         .xoff_gen_19(xoff_gen_19),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_19(xon_gen_19),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_19(magic_sleep_n_19),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2542,6 +3105,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_20(data_tx_ready_20),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_20(tx_ff_uflow_20),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_20(tx_crc_fwd_20),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_20(tx_egress_timestamp_request_valid_20),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_20(tx_egress_timestamp_request_data_20),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_20(tx_egress_timestamp_valid_20),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_20(tx_egress_timestamp_data_20),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_20(tx_time_of_day_data_20),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_20(tx_ingress_timestamp_valid_20),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_20(tx_ingress_timestamp_data_20),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_20(rx_ingress_timestamp_valid_20),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_20(rx_ingress_timestamp_data_20),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_20(rx_time_of_day_data_20),                                //INPUT  : Time of Day
         .xoff_gen_20(xoff_gen_20),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_20(xon_gen_20),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_20(magic_sleep_n_20),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2585,6 +3159,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_21(data_tx_ready_21),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_21(tx_ff_uflow_21),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_21(tx_crc_fwd_21),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_21(tx_egress_timestamp_request_valid_21),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_21(tx_egress_timestamp_request_data_21),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_21(tx_egress_timestamp_valid_21),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_21(tx_egress_timestamp_data_21),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_21(tx_time_of_day_data_21),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_21(tx_ingress_timestamp_valid_21),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_21(tx_ingress_timestamp_data_21),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_21(rx_ingress_timestamp_valid_21),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_21(rx_ingress_timestamp_data_21),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_21(rx_time_of_day_data_21),                                //INPUT  : Time of Day
         .xoff_gen_21(xoff_gen_21),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_21(xon_gen_21),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_21(magic_sleep_n_21),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2628,6 +3213,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_22(data_tx_ready_22),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_22(tx_ff_uflow_22),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_22(tx_crc_fwd_22),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_22(tx_egress_timestamp_request_valid_22),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_22(tx_egress_timestamp_request_data_22),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_22(tx_egress_timestamp_valid_22),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_22(tx_egress_timestamp_data_22),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_22(tx_time_of_day_data_22),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_22(tx_ingress_timestamp_valid_22),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_22(tx_ingress_timestamp_data_22),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_22(rx_ingress_timestamp_valid_22),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_22(rx_ingress_timestamp_data_22),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_22(rx_time_of_day_data_22),                                //INPUT  : Time of Day
         .xoff_gen_22(xoff_gen_22),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_22(xon_gen_22),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_22(magic_sleep_n_22),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2671,6 +3267,17 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         .data_tx_ready_23(data_tx_ready_23),        //OUTPUT : Data FIFO transmit Read Enable  
         .tx_ff_uflow_23(tx_ff_uflow_23),            //OUTPUT : TX FIFO underflow occured (Synchronous with tx_clk)
         .tx_crc_fwd_23(tx_crc_fwd_23),              //INPUT  : Forward Current Frame with CRC from Application
+        //IEEE1588's code
+        .tx_egress_timestamp_request_valid_23(tx_egress_timestamp_request_valid_23),    //INPUT  : Timestamp request valid from user
+        .tx_egress_timestamp_request_data_23(tx_egress_timestamp_request_data_23),      //INPUT  : Fingerprint associated to the timestamp request
+        .tx_egress_timestamp_valid_23(tx_egress_timestamp_valid_23),                    //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_egress_timestamp_data_23(tx_egress_timestamp_data_23),                      //OUTPUT : Timestamp + Fingerprint from TSU
+        .tx_time_of_day_data_23(tx_time_of_day_data_23),                                //INPUT  : Time of Day
+        .tx_ingress_timestamp_valid_23(tx_ingress_timestamp_valid_23),                  //INPUT  : Timestamp to TSU
+        .tx_ingress_timestamp_data_23(tx_ingress_timestamp_data_23),                    //INPUT  : Timestamp to TSU
+        .rx_ingress_timestamp_valid_23(rx_ingress_timestamp_valid_23),                  //OUTPUT : RX timestamp valid
+        .rx_ingress_timestamp_data_23(rx_ingress_timestamp_data_23),                    //OUTPUT : RX timestamp data
+        .rx_time_of_day_data_23(rx_time_of_day_data_23),                                //INPUT  : Time of Day
         .xoff_gen_23(xoff_gen_23),                  //INPUT  : XOFF PAUSE FRAME GENERATE
         .xon_gen_23(xon_gen_23),                    //INPUT  : XON PAUSE FRAME GENERATE
         .magic_sleep_n_23(magic_sleep_n_23),        //INPUT  : MAC SLEEP MODE CONTROL
@@ -2711,8 +3318,11 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
         U_MULTI_MAC_PCS.CHANNEL_WIDTH = CHANNEL_WIDTH,
         U_MULTI_MAC_PCS.ENABLE_RX_FIFO_STATUS = ENABLE_RX_FIFO_STATUS,
         U_MULTI_MAC_PCS.ENABLE_EXTENDED_STAT_REG = ENABLE_EXTENDED_STAT_REG,
-        U_MULTI_MAC_PCS.ENABLE_CLK_SHARING = ENABLE_CLK_SHARING,    
-        U_MULTI_MAC_PCS.ENABLE_REG_SHARING = ENABLE_REG_SHARING;    
+        U_MULTI_MAC_PCS.ENABLE_CLK_SHARING = ENABLE_CLK_SHARING,
+        U_MULTI_MAC_PCS.ENABLE_REG_SHARING = ENABLE_REG_SHARING,
+        U_MULTI_MAC_PCS.TSTAMP_FP_WIDTH = TSTAMP_FP_WIDTH,
+        U_MULTI_MAC_PCS.ENABLE_TIMESTAMPING = ENABLE_TIMESTAMPING,
+        U_MULTI_MAC_PCS.ENABLE_PTP_1STEP = ENABLE_PTP_1STEP;
 
 
 
@@ -2724,7 +3334,7 @@ wire pll_powerdown_sqcnr_23,tx_digitalreset_sqcnr_23,rx_analogreset_sqcnr_23,rx_
 // ---------------------------------------------
 reg data_in_0,gxb_pwrdn_in_sig_clk_0;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 0)
-    begin
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_0)
         begin
           if (gxb_pwrdn_in_0 == 1) begin
@@ -2733,7 +3343,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 0)
           end else begin
             data_in_0 <= 1'b0;
             gxb_pwrdn_in_sig_clk_0 <= data_in_0;
-          end
+          end   
         end
         assign gxb_pwrdn_in_sig[0] = gxb_pwrdn_in_0;
         assign pcs_pwrdn_out_0 = pcs_pwrdn_out_sig[0];
@@ -2743,9 +3353,9 @@ else
         assign gxb_pwrdn_in_sig[0] = pcs_pwrdn_out_sig[0];
         assign pcs_pwrdn_out_0 = 1'b0;
         always@(*) begin
-         gxb_pwrdn_in_sig_clk_0 = gxb_pwrdn_in_sig[0];
-        end
-    end      
+            gxb_pwrdn_in_sig_clk_0 = gxb_pwrdn_in_sig[0];
+        end      
+    end
 endgenerate
 
 
@@ -2756,10 +3366,10 @@ generate if (MAX_CHANNELS > 0)
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_0(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset | gxb_pwrdn_in_sig_clk_0),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_0),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),    
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -2773,7 +3383,6 @@ generate if (MAX_CHANNELS > 0)
             .manual_mode(1'b0),
             .rx_oc_busy(reconfig_busy_0)
         );
-        
         assign locked_signal_0 = (reset? 1'b0: pll_locked_0);
     // Instantiation of the Alt2gxb and Alt4gxb block as the PMA for Stratix_II_GX ,ArriaGX and Stratix IV devices
     // ----------------------------------------------------------------------------------- 
@@ -2782,11 +3391,11 @@ generate if (MAX_CHANNELS > 0)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_0_reset_sync_0 (
-        .clk(rx_pcs_clk_c0),
-        .reset_in(rx_digitalreset_sqcnr_0),
-        .reset_out(reset_rx_pcs_clk_c0_int)
+            .clk(rx_pcs_clk_c0),
+            .reset_in(rx_digitalreset_sqcnr_0),
+            .reset_out(reset_rx_pcs_clk_c0_int)
         );
-        
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_0
           (
             .clk(rx_pcs_clk_c0),
@@ -2813,8 +3422,8 @@ generate if (MAX_CHANNELS > 0)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[0]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[0])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_0.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_0.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -2865,7 +3474,6 @@ else
     assign link_status[0] = 1'b0;
     assign led_disp_err_0 = 1'b0;
     assign txp_0 = 1'b0;
-	assign pcs_clk_c0 = 1'b0;
     end      
 endgenerate
 
@@ -2879,7 +3487,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_1,gxb_pwrdn_in_sig_clk_1;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 1)
-    begin          
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_1)
         begin
           if (gxb_pwrdn_in_1 == 1) begin
@@ -2888,7 +3496,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 1)
           end else begin
             data_in_1 <= 1'b0;
             gxb_pwrdn_in_sig_clk_1 <= data_in_1;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[1] = gxb_pwrdn_in_1;
         assign pcs_pwrdn_out_1 = pcs_pwrdn_out_sig[1];
@@ -2899,24 +3507,22 @@ else
         assign pcs_pwrdn_out_1 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_1 = gxb_pwrdn_in_sig[1];
-        end
-    end      
+        end      
+    end
 endgenerate
- 
+
 
 generate if (MAX_CHANNELS > 1)
     begin  
         wire    locked_signal_1;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_1(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset | gxb_pwrdn_in_sig_clk_1),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_1),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),    
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -2930,7 +3536,7 @@ generate if (MAX_CHANNELS > 1)
             .manual_mode(1'b0),
             .rx_oc_busy(reconfig_busy_1)
         );
-        assign locked_signal_1 = (reset? 1'b0: pll_locked_1);        
+        assign locked_signal_1 = (reset? 1'b0: pll_locked_1);
     // Instantiation of the Alt2gxb and Alt4gxb block as the PMA for Stratix_II_GX ,ArriaGX and Stratix IV devices
     // ----------------------------------------------------------------------------------- 
     
@@ -2938,10 +3544,11 @@ generate if (MAX_CHANNELS > 1)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_1_reset_sync_0 (
-        .clk(rx_pcs_clk_c1),
-        .reset_in(rx_digitalreset_sqcnr_1),
-        .reset_out(reset_rx_pcs_clk_c1_int)
+            .clk(rx_pcs_clk_c1),
+            .reset_in(rx_digitalreset_sqcnr_1),
+            .reset_out(reset_rx_pcs_clk_c1_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_1
           (
             .clk(rx_pcs_clk_c1),
@@ -2968,8 +3575,8 @@ generate if (MAX_CHANNELS > 1)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[1]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[1])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_1.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_1.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3020,7 +3627,6 @@ else
     assign link_status[1] = 1'b0;
     assign led_disp_err_1 = 1'b0;
     assign txp_1 = 1'b0;
-	assign pcs_clk_c1 = 1'b0;
     end      
 endgenerate
 
@@ -3034,8 +3640,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_2,gxb_pwrdn_in_sig_clk_2;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 2)
-    begin
-        
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_2)
         begin
           if (gxb_pwrdn_in_2 == 1) begin
@@ -3044,7 +3649,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 2)
           end else begin
             data_in_2 <= 1'b0;
             gxb_pwrdn_in_sig_clk_2 <= data_in_2;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[2] = gxb_pwrdn_in_2;
         assign pcs_pwrdn_out_2 = pcs_pwrdn_out_sig[2];
@@ -3055,24 +3660,22 @@ else
         assign pcs_pwrdn_out_2 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_2 = gxb_pwrdn_in_sig[2];
-        end
-    end      
+        end      
+    end
 endgenerate
 
 
 generate if (MAX_CHANNELS > 2)
     begin  
         wire    locked_signal_2;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_2(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset | gxb_pwrdn_in_sig_clk_2),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_2),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -3086,7 +3689,7 @@ generate if (MAX_CHANNELS > 2)
             .manual_mode(1'b0),
             .rx_oc_busy(reconfig_busy_2)
         );
-        assign locked_signal_2 = (reset? 1'b0: pll_locked_2);    
+        assign locked_signal_2 = (reset? 1'b0: pll_locked_2);
     // Instantiation of the Alt2gxb and Alt4gxb block as the PMA for Stratix_II_GX ,ArriaGX and Stratix IV devices
     // ----------------------------------------------------------------------------------- 
     
@@ -3094,10 +3697,11 @@ generate if (MAX_CHANNELS > 2)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_2_reset_sync_0 (
-        .clk(rx_pcs_clk_c2),
-        .reset_in(rx_digitalreset_sqcnr_2),
-        .reset_out(reset_rx_pcs_clk_c2_int)
+            .clk(rx_pcs_clk_c2),
+            .reset_in(rx_digitalreset_sqcnr_2),
+            .reset_out(reset_rx_pcs_clk_c2_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_2
           (
             .clk(rx_pcs_clk_c2),
@@ -3124,8 +3728,8 @@ generate if (MAX_CHANNELS > 2)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[2]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[2])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_2.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_2.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3176,7 +3780,6 @@ else
     assign link_status[2] = 1'b0;
     assign led_disp_err_2 = 1'b0;
     assign txp_2 = 1'b0;
-	assign pcs_clk_c2 = 1'b0;
     end      
 endgenerate
 
@@ -3190,7 +3793,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_3,gxb_pwrdn_in_sig_clk_3;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 3)
-    begin
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_3)
         begin
           if (gxb_pwrdn_in_3 == 1) begin
@@ -3199,7 +3802,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 3)
           end else begin
             data_in_3 <= 1'b0;
             gxb_pwrdn_in_sig_clk_3 <= data_in_3;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[3] = gxb_pwrdn_in_3;
         assign pcs_pwrdn_out_3 = pcs_pwrdn_out_sig[3];
@@ -3210,23 +3813,22 @@ else
         assign pcs_pwrdn_out_3 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_3 = gxb_pwrdn_in_sig[3];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 3)
     begin  
         wire    locked_signal_3;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_3(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_3),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_3),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -3248,10 +3850,11 @@ generate if (MAX_CHANNELS > 3)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_3_reset_sync_0 (
-        .clk(rx_pcs_clk_c3),
-        .reset_in(rx_digitalreset_sqcnr_3),
-        .reset_out(reset_rx_pcs_clk_c3_int)
+            .clk(rx_pcs_clk_c3),
+            .reset_in(rx_digitalreset_sqcnr_3),
+            .reset_out(reset_rx_pcs_clk_c3_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_3
           (
             .clk(rx_pcs_clk_c3),
@@ -3278,8 +3881,8 @@ generate if (MAX_CHANNELS > 3)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[3]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[3])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_3.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_3.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3330,7 +3933,6 @@ else
     assign link_status[3] = 1'b0;
     assign led_disp_err_3 = 1'b0;
     assign txp_3 = 1'b0;
-	assign pcs_clk_c3 = 1'b0;
     end      
 endgenerate
 
@@ -3344,7 +3946,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_4,gxb_pwrdn_in_sig_clk_4;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 4)
-    begin
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_4)
         begin
           if (gxb_pwrdn_in_4 == 1) begin
@@ -3353,7 +3955,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 4)
           end else begin
             data_in_4 <= 1'b0;
             gxb_pwrdn_in_sig_clk_4 <= data_in_4;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[4] = gxb_pwrdn_in_4;
         assign pcs_pwrdn_out_4 = pcs_pwrdn_out_sig[4];
@@ -3364,23 +3966,22 @@ else
         assign pcs_pwrdn_out_4 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_4 = gxb_pwrdn_in_sig[4];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 4)
     begin  
         wire    locked_signal_4;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_4(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_4),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_4),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -3402,10 +4003,11 @@ generate if (MAX_CHANNELS > 4)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_4_reset_sync_0 (
-        .clk(rx_pcs_clk_c4),
-        .reset_in(rx_digitalreset_sqcnr_4),
-        .reset_out(reset_rx_pcs_clk_c4_int)
+            .clk(rx_pcs_clk_c4),
+            .reset_in(rx_digitalreset_sqcnr_4),
+            .reset_out(reset_rx_pcs_clk_c4_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_4
           (
             .clk(rx_pcs_clk_c4),
@@ -3432,8 +4034,8 @@ generate if (MAX_CHANNELS > 4)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[4]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[4])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_4.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_4.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3484,7 +4086,6 @@ else
     assign link_status[4] = 1'b0;
     assign led_disp_err_4 = 1'b0;
     assign txp_4 = 1'b0;
-	assign pcs_clk_c4 = 1'b0;
     end      
 endgenerate
 
@@ -3498,7 +4099,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_5,gxb_pwrdn_in_sig_clk_5;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 5)
-    begin          
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_5)
         begin
           if (gxb_pwrdn_in_5 == 1) begin
@@ -3507,7 +4108,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 5)
           end else begin
             data_in_5 <= 1'b0;
             gxb_pwrdn_in_sig_clk_5 <= data_in_5;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[5] = gxb_pwrdn_in_5;
         assign pcs_pwrdn_out_5 = pcs_pwrdn_out_sig[5];
@@ -3515,27 +4116,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 5)
 else
     begin
         assign gxb_pwrdn_in_sig[5] = pcs_pwrdn_out_sig[5];
-		assign pcs_pwrdn_out_5 = 1'b0;
+        assign pcs_pwrdn_out_5 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_5 = gxb_pwrdn_in_sig[5];
-        end
-    end      
+        end      
+    end
 endgenerate
 
 
 generate if (MAX_CHANNELS > 5)
-    begin 
+    begin  
         wire    locked_signal_5;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_5(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_5),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_5),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -3557,10 +4156,11 @@ generate if (MAX_CHANNELS > 5)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_5_reset_sync_0 (
-        .clk(rx_pcs_clk_c5),
-        .reset_in(rx_digitalreset_sqcnr_5),
-        .reset_out(reset_rx_pcs_clk_c5_int)
+            .clk(rx_pcs_clk_c5),
+            .reset_in(rx_digitalreset_sqcnr_5),
+            .reset_out(reset_rx_pcs_clk_c5_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_5
           (
             .clk(rx_pcs_clk_c5),
@@ -3587,8 +4187,8 @@ generate if (MAX_CHANNELS > 5)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[5]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[5])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_5.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_5.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3607,7 +4207,7 @@ generate if (MAX_CHANNELS > 5)
             .rx_clkout (rx_pcs_clk_c5),
             .rx_datain (rxp_5),
             .rx_dataout (rx_frame_5),
-            .rx_digitalreset (rx_digitalreset_sqcnr_4),
+            .rx_digitalreset (rx_digitalreset_sqcnr_5),
             .rx_disperr (rx_disp_err[5]),
             .rx_errdetect (rx_char_err_gx[5]),
             .rx_patterndetect (rx_patterndetect[5]),
@@ -3639,7 +4239,6 @@ else
     assign link_status[5] = 1'b0;
     assign led_disp_err_5 = 1'b0;
     assign txp_5 = 1'b0;
-	assign pcs_clk_c5 = 1'b0;
     end      
 endgenerate
 
@@ -3653,7 +4252,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_6,gxb_pwrdn_in_sig_clk_6;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 6)
-    begin         
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_6)
         begin
           if (gxb_pwrdn_in_6 == 1) begin
@@ -3662,7 +4261,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 6)
           end else begin
             data_in_6 <= 1'b0;
             gxb_pwrdn_in_sig_clk_6 <= data_in_6;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[6] = gxb_pwrdn_in_6;
         assign pcs_pwrdn_out_6 = pcs_pwrdn_out_sig[6];
@@ -3670,26 +4269,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 6)
 else
     begin
         assign gxb_pwrdn_in_sig[6] = pcs_pwrdn_out_sig[6];
-		assign pcs_pwrdn_out_6 = 1'b0;
-        always@(*) begin 
+        assign pcs_pwrdn_out_6 = 1'b0;
+        always@(*) begin
             gxb_pwrdn_in_sig_clk_6 = gxb_pwrdn_in_sig[6];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 6)
     begin  
         wire    locked_signal_6;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_6(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_6),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_6),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -3703,7 +4301,7 @@ generate if (MAX_CHANNELS > 6)
             .manual_mode(1'b0),
             .rx_oc_busy(reconfig_busy_6)
         );
-        assign locked_signal_6 = (reset? 1'b0: pll_locked_6);    
+        assign locked_signal_6 = (reset? 1'b0: pll_locked_6);
     // Instantiation of the Alt2gxb and Alt4gxb block as the PMA for Stratix_II_GX ,ArriaGX and Stratix IV devices
     // ----------------------------------------------------------------------------------- 
     
@@ -3711,10 +4309,11 @@ generate if (MAX_CHANNELS > 6)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_6_reset_sync_0 (
-        .clk(rx_pcs_clk_c6),
-        .reset_in(rx_digitalreset_sqcnr_6),
-        .reset_out(reset_rx_pcs_clk_c6_int)
+            .clk(rx_pcs_clk_c6),
+            .reset_in(rx_digitalreset_sqcnr_6),
+            .reset_out(reset_rx_pcs_clk_c6_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_6
           (
             .clk(rx_pcs_clk_c6),
@@ -3741,8 +4340,8 @@ generate if (MAX_CHANNELS > 6)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[6]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[6])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_6.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_6.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3793,7 +4392,6 @@ else
     assign link_status[6] = 1'b0;
     assign led_disp_err_6 = 1'b0;
     assign txp_6 = 1'b0;
-	assign pcs_clk_c6 = 1'b0;
     end      
 endgenerate
 
@@ -3807,7 +4405,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_7,gxb_pwrdn_in_sig_clk_7;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 7)
-    begin         
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_7)
         begin
           if (gxb_pwrdn_in_7 == 1) begin
@@ -3816,7 +4414,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 7)
           end else begin
             data_in_7 <= 1'b0;
             gxb_pwrdn_in_sig_clk_7 <= data_in_7;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[7] = gxb_pwrdn_in_7;
         assign pcs_pwrdn_out_7 = pcs_pwrdn_out_sig[7];
@@ -3824,27 +4422,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 7)
 else
     begin
         assign gxb_pwrdn_in_sig[7] = pcs_pwrdn_out_sig[7];
-		assign pcs_pwrdn_out_7 = 1'b0;
+        assign pcs_pwrdn_out_7 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_7 = gxb_pwrdn_in_sig[7];
-        end
-    end      
+        end      
+    end
 endgenerate
 
 
 generate if (MAX_CHANNELS > 7)
     begin  
         wire    locked_signal_7;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_7(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_7),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_7),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -3858,7 +4454,7 @@ generate if (MAX_CHANNELS > 7)
             .manual_mode(1'b0),
             .rx_oc_busy(reconfig_busy_7)
         );
-        assign locked_signal_7 = (reset? 1'b0: pll_locked_7);  
+        assign locked_signal_7 = (reset? 1'b0: pll_locked_7);
     // Instantiation of the Alt2gxb and Alt4gxb block as the PMA for Stratix_II_GX ,ArriaGX and Stratix IV devices
     // ----------------------------------------------------------------------------------- 
     
@@ -3866,10 +4462,11 @@ generate if (MAX_CHANNELS > 7)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_7_reset_sync_0 (
-        .clk(rx_pcs_clk_c7),
-        .reset_in(rx_digitalreset_sqcnr_7),
-        .reset_out(reset_rx_pcs_clk_c7_int)
+            .clk(rx_pcs_clk_c7),
+            .reset_in(rx_digitalreset_sqcnr_7),
+            .reset_out(reset_rx_pcs_clk_c7_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_7
           (
             .clk(rx_pcs_clk_c7),
@@ -3896,8 +4493,8 @@ generate if (MAX_CHANNELS > 7)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[7]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[7])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_7.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_7.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -3948,7 +4545,6 @@ else
     assign link_status[7] = 1'b0;
     assign led_disp_err_7 = 1'b0;
     assign txp_7 = 1'b0;
-	assign pcs_clk_c7 = 1'b0;
     end      
 endgenerate
 
@@ -3962,7 +4558,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_8,gxb_pwrdn_in_sig_clk_8;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 8)
-    begin
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_8)
         begin
           if (gxb_pwrdn_in_8 == 1) begin
@@ -3971,7 +4567,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 8)
           end else begin
             data_in_8 <= 1'b0;
             gxb_pwrdn_in_sig_clk_8 <= data_in_8;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[8] = gxb_pwrdn_in_8;
         assign pcs_pwrdn_out_8 = pcs_pwrdn_out_sig[8];
@@ -3979,26 +4575,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 8)
 else
     begin
         assign gxb_pwrdn_in_sig[8] = pcs_pwrdn_out_sig[8];
-		assign pcs_pwrdn_out_8 = 1'b0;
+        assign pcs_pwrdn_out_8 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_8 = gxb_pwrdn_in_sig[8];
-		end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 8)
     begin  
         wire    locked_signal_8;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_8(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_8),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_8),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -4012,7 +4607,7 @@ generate if (MAX_CHANNELS > 8)
             .manual_mode(1'b0),
             .rx_oc_busy(reconfig_busy_8)
         );
-        assign locked_signal_8 = (reset? 1'b0: pll_locked_8);    
+        assign locked_signal_8 = (reset? 1'b0: pll_locked_8);
     // Instantiation of the Alt2gxb and Alt4gxb block as the PMA for Stratix_II_GX ,ArriaGX and Stratix IV devices
     // ----------------------------------------------------------------------------------- 
     
@@ -4020,10 +4615,11 @@ generate if (MAX_CHANNELS > 8)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_8_reset_sync_0 (
-        .clk(rx_pcs_clk_c8),
-        .reset_in(rx_digitalreset_sqcnr_8),
-        .reset_out(reset_rx_pcs_clk_c8_int)
+            .clk(rx_pcs_clk_c8),
+            .reset_in(rx_digitalreset_sqcnr_8),
+            .reset_out(reset_rx_pcs_clk_c8_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_8
           (
             .clk(rx_pcs_clk_c8),
@@ -4050,8 +4646,8 @@ generate if (MAX_CHANNELS > 8)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[8]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[8])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_8.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_8.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4102,7 +4698,6 @@ else
     assign link_status[8] = 1'b0;
     assign led_disp_err_8 = 1'b0;
     assign txp_8 = 1'b0;
-	assign pcs_clk_c8 = 1'b0;
     end      
 endgenerate
 
@@ -4116,7 +4711,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_9,gxb_pwrdn_in_sig_clk_9;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 9)
-    begin          
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_9)
         begin
           if (gxb_pwrdn_in_9 == 1) begin
@@ -4125,7 +4720,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 9)
           end else begin
             data_in_9 <= 1'b0;
             gxb_pwrdn_in_sig_clk_9 <= data_in_9;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[9] = gxb_pwrdn_in_9;
         assign pcs_pwrdn_out_9 = pcs_pwrdn_out_sig[9];
@@ -4133,27 +4728,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 9)
 else
     begin
         assign gxb_pwrdn_in_sig[9] = pcs_pwrdn_out_sig[9];
-		assign pcs_pwrdn_out_9 = 1'b0;
+        assign pcs_pwrdn_out_9 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_9 = gxb_pwrdn_in_sig[9];
-        end
-    end      
+        end      
+    end
 endgenerate
 
 
 generate if (MAX_CHANNELS > 9)
     begin  
         wire    locked_signal_9;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_9(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_9),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_9),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -4167,7 +4760,7 @@ generate if (MAX_CHANNELS > 9)
             .manual_mode(1'b0),
             .rx_oc_busy(reconfig_busy_9)
         );
-        assign locked_signal_9 = (reset? 1'b0: pll_locked_9);    
+        assign locked_signal_9 = (reset? 1'b0: pll_locked_9);
     // Instantiation of the Alt2gxb and Alt4gxb block as the PMA for Stratix_II_GX ,ArriaGX and Stratix IV devices
     // ----------------------------------------------------------------------------------- 
     
@@ -4175,10 +4768,11 @@ generate if (MAX_CHANNELS > 9)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_9_reset_sync_0 (
-        .clk(rx_pcs_clk_c9),
-        .reset_in(rx_digitalreset_sqcnr_9),
-        .reset_out(reset_rx_pcs_clk_c9_int)
+            .clk(rx_pcs_clk_c9),
+            .reset_in(rx_digitalreset_sqcnr_9),
+            .reset_out(reset_rx_pcs_clk_c9_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_9
           (
             .clk(rx_pcs_clk_c9),
@@ -4205,8 +4799,8 @@ generate if (MAX_CHANNELS > 9)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[9]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[9])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_9.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_9.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4257,7 +4851,6 @@ else
     assign link_status[9] = 1'b0;
     assign led_disp_err_9 = 1'b0;
     assign txp_9 = 1'b0;
-	assign pcs_clk_c9 = 1'b0;
     end      
 endgenerate
 
@@ -4271,7 +4864,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_10,gxb_pwrdn_in_sig_clk_10;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 10)
-    begin  
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_10)
         begin
           if (gxb_pwrdn_in_10 == 1) begin
@@ -4280,7 +4873,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 10)
           end else begin
             data_in_10 <= 1'b0;
             gxb_pwrdn_in_sig_clk_10 <= data_in_10;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[10] = gxb_pwrdn_in_10;
         assign pcs_pwrdn_out_10 = pcs_pwrdn_out_sig[10];
@@ -4288,26 +4881,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 10)
 else
     begin
         assign gxb_pwrdn_in_sig[10] = pcs_pwrdn_out_sig[10];
-		assign pcs_pwrdn_out_10 = 1'b0;
+        assign pcs_pwrdn_out_10 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_10 = gxb_pwrdn_in_sig[10];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 10)
     begin  
         wire    locked_signal_10;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_10(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_10),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_10),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -4329,10 +4921,11 @@ generate if (MAX_CHANNELS > 10)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_10_reset_sync_0 (
-        .clk(rx_pcs_clk_c10),
-        .reset_in(rx_digitalreset_sqcnr_10),
-        .reset_out(reset_rx_pcs_clk_c10_int)
+            .clk(rx_pcs_clk_c10),
+            .reset_in(rx_digitalreset_sqcnr_10),
+            .reset_out(reset_rx_pcs_clk_c10_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_10
           (
             .clk(rx_pcs_clk_c10),
@@ -4359,8 +4952,8 @@ generate if (MAX_CHANNELS > 10)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[10]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[10])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_10.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_10.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4411,7 +5004,6 @@ else
     assign link_status[10] = 1'b0;
     assign led_disp_err_10 = 1'b0;
     assign txp_10 = 1'b0;
-	assign pcs_clk_c10 = 1'b0;
     end      
 endgenerate
 
@@ -4425,7 +5017,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_11,gxb_pwrdn_in_sig_clk_11;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 11)
-    begin
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_11)
         begin
           if (gxb_pwrdn_in_11 == 1) begin
@@ -4434,7 +5026,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 11)
           end else begin
             data_in_11 <= 1'b0;
             gxb_pwrdn_in_sig_clk_11 <= data_in_11;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[11] = gxb_pwrdn_in_11;
         assign pcs_pwrdn_out_11 = pcs_pwrdn_out_sig[11];
@@ -4442,27 +5034,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 11)
 else
     begin
         assign gxb_pwrdn_in_sig[11] = pcs_pwrdn_out_sig[11];
-		assign pcs_pwrdn_out_11 = 1'b0;
+        assign pcs_pwrdn_out_11 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_11 = gxb_pwrdn_in_sig[11];
-        end
-    end      
+        end      
+    end
 endgenerate
 
 
 generate if (MAX_CHANNELS > 11)
     begin  
         wire    locked_signal_11;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_11(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_11),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_11),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -4484,10 +5074,11 @@ generate if (MAX_CHANNELS > 11)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_11_reset_sync_0 (
-        .clk(rx_pcs_clk_c11),
-        .reset_in(rx_digitalreset_sqcnr_11),
-        .reset_out(reset_rx_pcs_clk_c11_int)
+            .clk(rx_pcs_clk_c11),
+            .reset_in(rx_digitalreset_sqcnr_11),
+            .reset_out(reset_rx_pcs_clk_c11_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_11
           (
             .clk(rx_pcs_clk_c11),
@@ -4514,8 +5105,8 @@ generate if (MAX_CHANNELS > 11)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[11]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[11])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_11.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_11.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4566,7 +5157,6 @@ else
     assign link_status[11] = 1'b0;
     assign led_disp_err_11 = 1'b0;
     assign txp_11 = 1'b0;
-	assign pcs_clk_c11 = 1'b0;
     end      
 endgenerate
 
@@ -4578,9 +5168,9 @@ endgenerate
 
 // Export powerdown signal or wire it internally
 // ---------------------------------------------
- reg data_in_12,gxb_pwrdn_in_sig_clk_12;
+reg data_in_12,gxb_pwrdn_in_sig_clk_12;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 12)
-    begin          
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_12)
         begin
           if (gxb_pwrdn_in_12 == 1) begin
@@ -4589,7 +5179,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 12)
           end else begin
             data_in_12 <= 1'b0;
             gxb_pwrdn_in_sig_clk_12 <= data_in_12;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[12] = gxb_pwrdn_in_12;
         assign pcs_pwrdn_out_12 = pcs_pwrdn_out_sig[12];
@@ -4597,27 +5187,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 12)
 else
     begin
         assign gxb_pwrdn_in_sig[12] = pcs_pwrdn_out_sig[12];
-		assign pcs_pwrdn_out_12 = 1'b0;
+        assign pcs_pwrdn_out_12 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_12 = gxb_pwrdn_in_sig[12];
-        end
-    end      
+        end      
+    end
 endgenerate
 
 
 generate if (MAX_CHANNELS > 12)
     begin  
         wire    locked_signal_12;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_12(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_12),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_12),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -4639,10 +5227,11 @@ generate if (MAX_CHANNELS > 12)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_12_reset_sync_0 (
-        .clk(rx_pcs_clk_c12),
-        .reset_in(rx_digitalreset_sqcnr_12),
-        .reset_out(reset_rx_pcs_clk_c12_int)
+            .clk(rx_pcs_clk_c12),
+            .reset_in(rx_digitalreset_sqcnr_12),
+            .reset_out(reset_rx_pcs_clk_c12_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_12
           (
             .clk(rx_pcs_clk_c12),
@@ -4669,8 +5258,8 @@ generate if (MAX_CHANNELS > 12)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[12]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[12])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_12.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_12.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4706,7 +5295,7 @@ generate if (MAX_CHANNELS > 12)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[12]),
             .rx_runningdisp(rx_runningdisp[12]),
             .pll_powerdown(gxb_pwrdn_in_sig[12]),
-            .pll_locked(pll_locked_12)
+            .pll_locked(pll_locked_12) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_12.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -4721,7 +5310,6 @@ else
     assign link_status[12] = 1'b0;
     assign led_disp_err_12 = 1'b0;
     assign txp_12 = 1'b0;
-	assign pcs_clk_c12 = 1'b0;
     end      
 endgenerate
 
@@ -4735,7 +5323,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_13,gxb_pwrdn_in_sig_clk_13;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 13)
-    begin
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_13)
         begin
           if (gxb_pwrdn_in_13 == 1) begin
@@ -4744,7 +5332,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 13)
           end else begin
             data_in_13 <= 1'b0;
             gxb_pwrdn_in_sig_clk_13 <= data_in_13;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[13] = gxb_pwrdn_in_13;
         assign pcs_pwrdn_out_13 = pcs_pwrdn_out_sig[13];
@@ -4752,26 +5340,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 13)
 else
     begin
         assign gxb_pwrdn_in_sig[13] = pcs_pwrdn_out_sig[13];
-		assign pcs_pwrdn_out_13 = 1'b0;
+        assign pcs_pwrdn_out_13 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_13 = gxb_pwrdn_in_sig[13];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 13)
     begin  
         wire    locked_signal_13;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_13(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_13),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_13),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -4793,10 +5380,11 @@ generate if (MAX_CHANNELS > 13)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_13_reset_sync_0 (
-        .clk(rx_pcs_clk_c13),
-        .reset_in(rx_digitalreset_sqcnr_13),
-        .reset_out(reset_rx_pcs_clk_c13_int)
+            .clk(rx_pcs_clk_c13),
+            .reset_in(rx_digitalreset_sqcnr_13),
+            .reset_out(reset_rx_pcs_clk_c13_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_13
           (
             .clk(rx_pcs_clk_c13),
@@ -4823,8 +5411,8 @@ generate if (MAX_CHANNELS > 13)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[13]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[13])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_13.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_13.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -4860,7 +5448,7 @@ generate if (MAX_CHANNELS > 13)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[13]),
             .rx_runningdisp(rx_runningdisp[13]),
             .pll_powerdown(gxb_pwrdn_in_sig[13]),
-            .pll_locked(pll_locked_13)
+            .pll_locked(pll_locked_13) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_13.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -4875,7 +5463,6 @@ else
     assign link_status[13] = 1'b0;
     assign led_disp_err_13 = 1'b0;
     assign txp_13 = 1'b0;
-	assign pcs_clk_c13 = 1'b0;
     end      
 endgenerate
 
@@ -4889,7 +5476,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_14,gxb_pwrdn_in_sig_clk_14;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 14)
-    begin
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_14)
         begin
           if (gxb_pwrdn_in_14 == 1) begin
@@ -4898,7 +5485,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 14)
           end else begin
             data_in_14 <= 1'b0;
             gxb_pwrdn_in_sig_clk_14 <= data_in_14;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[14] = gxb_pwrdn_in_14;
         assign pcs_pwrdn_out_14 = pcs_pwrdn_out_sig[14];
@@ -4906,26 +5493,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 14)
 else
     begin
         assign gxb_pwrdn_in_sig[14] = pcs_pwrdn_out_sig[14];
-		assign pcs_pwrdn_out_14 = 1'b0;
+        assign pcs_pwrdn_out_14 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_14 = gxb_pwrdn_in_sig[14];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 14)
     begin  
         wire    locked_signal_14;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_14(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_14),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_14),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -4947,10 +5533,11 @@ generate if (MAX_CHANNELS > 14)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_14_reset_sync_0 (
-        .clk(rx_pcs_clk_c14),
-        .reset_in(rx_digitalreset_sqcnr_14),
-        .reset_out(reset_rx_pcs_clk_c14_int)
+            .clk(rx_pcs_clk_c14),
+            .reset_in(rx_digitalreset_sqcnr_14),
+            .reset_out(reset_rx_pcs_clk_c14_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_14
           (
             .clk(rx_pcs_clk_c14),
@@ -4977,8 +5564,8 @@ generate if (MAX_CHANNELS > 14)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[14]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[14])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_14.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_14.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -5014,7 +5601,7 @@ generate if (MAX_CHANNELS > 14)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[14]),
             .rx_runningdisp(rx_runningdisp[14]),
             .pll_powerdown(gxb_pwrdn_in_sig[14]),
-            .pll_locked(pll_locked_14)
+            .pll_locked(pll_locked_14) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_14.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -5029,7 +5616,6 @@ else
     assign link_status[14] = 1'b0;
     assign led_disp_err_14 = 1'b0;
     assign txp_14 = 1'b0;
-	assign pcs_clk_c14 = 1'b0;
     end      
 endgenerate
 
@@ -5043,7 +5629,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_15,gxb_pwrdn_in_sig_clk_15;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 15)
-    begin
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_15)
         begin
           if (gxb_pwrdn_in_15 == 1) begin
@@ -5052,7 +5638,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 15)
           end else begin
             data_in_15 <= 1'b0;
             gxb_pwrdn_in_sig_clk_15 <= data_in_15;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[15] = gxb_pwrdn_in_15;
         assign pcs_pwrdn_out_15 = pcs_pwrdn_out_sig[15];
@@ -5060,26 +5646,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 15)
 else
     begin
         assign gxb_pwrdn_in_sig[15] = pcs_pwrdn_out_sig[15];
-		assign pcs_pwrdn_out_15 = 1'b0;
+        assign pcs_pwrdn_out_15 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_15 = gxb_pwrdn_in_sig[15];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 15)
     begin  
         wire    locked_signal_15;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_15(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_15),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_15),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -5101,10 +5686,11 @@ generate if (MAX_CHANNELS > 15)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_15_reset_sync_0 (
-        .clk(rx_pcs_clk_c15),
-        .reset_in(rx_digitalreset_sqcnr_15),
-        .reset_out(reset_rx_pcs_clk_c15_int)
+            .clk(rx_pcs_clk_c15),
+            .reset_in(rx_digitalreset_sqcnr_15),
+            .reset_out(reset_rx_pcs_clk_c15_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_15
           (
             .clk(rx_pcs_clk_c15),
@@ -5131,8 +5717,8 @@ generate if (MAX_CHANNELS > 15)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[15]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[15])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_15.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_15.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -5168,7 +5754,7 @@ generate if (MAX_CHANNELS > 15)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[15]),
             .rx_runningdisp(rx_runningdisp[15]),
             .pll_powerdown(gxb_pwrdn_in_sig[15]),
-            .pll_locked(pll_locked_15)
+            .pll_locked(pll_locked_15) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_15.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -5183,7 +5769,6 @@ else
     assign link_status[15] = 1'b0;
     assign led_disp_err_15 = 1'b0;
     assign txp_15 = 1'b0;
-	assign pcs_clk_c15 = 1'b0;
     end      
 endgenerate
 
@@ -5197,7 +5782,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_16,gxb_pwrdn_in_sig_clk_16;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 16)
-    begin          
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_16)
         begin
           if (gxb_pwrdn_in_16 == 1) begin
@@ -5206,7 +5791,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 16)
           end else begin
             data_in_16 <= 1'b0;
             gxb_pwrdn_in_sig_clk_16 <= data_in_16;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[16] = gxb_pwrdn_in_16;
         assign pcs_pwrdn_out_16 = pcs_pwrdn_out_sig[16];
@@ -5214,26 +5799,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 16)
 else
     begin
         assign gxb_pwrdn_in_sig[16] = pcs_pwrdn_out_sig[16];
-		assign pcs_pwrdn_out_16 = 1'b0;
+        assign pcs_pwrdn_out_16 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_16 = gxb_pwrdn_in_sig[16];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 16)
     begin  
         wire    locked_signal_16;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_16(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_16),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_16),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -5255,10 +5839,11 @@ generate if (MAX_CHANNELS > 16)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_16_reset_sync_0 (
-        .clk(rx_pcs_clk_c16),
-        .reset_in(rx_digitalreset_sqcnr_16),
-        .reset_out(reset_rx_pcs_clk_c16_int)
+            .clk(rx_pcs_clk_c16),
+            .reset_in(rx_digitalreset_sqcnr_16),
+            .reset_out(reset_rx_pcs_clk_c16_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_16
           (
             .clk(rx_pcs_clk_c16),
@@ -5285,8 +5870,8 @@ generate if (MAX_CHANNELS > 16)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[16]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[16])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_16.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_16.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -5322,7 +5907,7 @@ generate if (MAX_CHANNELS > 16)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[16]),
             .rx_runningdisp(rx_runningdisp[16]),
             .pll_powerdown(gxb_pwrdn_in_sig[16]),
-            .pll_locked(pll_locked_16)
+            .pll_locked(pll_locked_16) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_16.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -5337,7 +5922,6 @@ else
     assign link_status[16] = 1'b0;
     assign led_disp_err_16 = 1'b0;
     assign txp_16 = 1'b0;
-	assign pcs_clk_c16 = 1'b0;
     end      
 endgenerate
 
@@ -5351,7 +5935,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_17,gxb_pwrdn_in_sig_clk_17;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 17)
-    begin      
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_17)
         begin
           if (gxb_pwrdn_in_17 == 1) begin
@@ -5360,7 +5944,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 17)
           end else begin
             data_in_17 <= 1'b0;
             gxb_pwrdn_in_sig_clk_17 <= data_in_17;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[17] = gxb_pwrdn_in_17;
         assign pcs_pwrdn_out_17 = pcs_pwrdn_out_sig[17];
@@ -5368,26 +5952,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 17)
 else
     begin
         assign gxb_pwrdn_in_sig[17] = pcs_pwrdn_out_sig[17];
-		assign pcs_pwrdn_out_17 = 1'b0;
+        assign pcs_pwrdn_out_17 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_17 = gxb_pwrdn_in_sig[17];
-        end
-    end      
+        end      
+    end
 endgenerate
 
+
 generate if (MAX_CHANNELS > 17)
-    begin 
+    begin  
         wire    locked_signal_17;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_17(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_17),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_17),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -5409,10 +5992,11 @@ generate if (MAX_CHANNELS > 17)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_17_reset_sync_0 (
-        .clk(rx_pcs_clk_c17),
-        .reset_in(rx_digitalreset_sqcnr_17),
-        .reset_out(reset_rx_pcs_clk_c17_int)
+            .clk(rx_pcs_clk_c17),
+            .reset_in(rx_digitalreset_sqcnr_17),
+            .reset_out(reset_rx_pcs_clk_c17_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_17
           (
             .clk(rx_pcs_clk_c17),
@@ -5439,8 +6023,8 @@ generate if (MAX_CHANNELS > 17)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[17]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[17])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_17.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_17.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -5476,7 +6060,7 @@ generate if (MAX_CHANNELS > 17)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[17]),
             .rx_runningdisp(rx_runningdisp[17]),
             .pll_powerdown(gxb_pwrdn_in_sig[17]),
-            .pll_locked(pll_locked_17)
+            .pll_locked(pll_locked_17) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_17.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -5491,7 +6075,6 @@ else
     assign link_status[17] = 1'b0;
     assign led_disp_err_17 = 1'b0;
     assign txp_17 = 1'b0;
-	assign pcs_clk_c17 = 1'b0;
     end      
 endgenerate
 
@@ -5505,7 +6088,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_18,gxb_pwrdn_in_sig_clk_18;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 18)
-    begin          
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_18)
         begin
           if (gxb_pwrdn_in_18 == 1) begin
@@ -5514,7 +6097,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 18)
           end else begin
             data_in_18 <= 1'b0;
             gxb_pwrdn_in_sig_clk_18 <= data_in_18;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[18] = gxb_pwrdn_in_18;
         assign pcs_pwrdn_out_18 = pcs_pwrdn_out_sig[18];
@@ -5522,26 +6105,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 18)
 else
     begin
         assign gxb_pwrdn_in_sig[18] = pcs_pwrdn_out_sig[18];
-		assign pcs_pwrdn_out_18 = 1'b0;
+        assign pcs_pwrdn_out_18 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_18 = gxb_pwrdn_in_sig[18];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 18)
     begin  
         wire    locked_signal_18;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_18(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_18),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_18),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -5563,10 +6145,11 @@ generate if (MAX_CHANNELS > 18)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_18_reset_sync_0 (
-        .clk(rx_pcs_clk_c18),
-        .reset_in(rx_digitalreset_sqcnr_18),
-        .reset_out(reset_rx_pcs_clk_c18_int)
+            .clk(rx_pcs_clk_c18),
+            .reset_in(rx_digitalreset_sqcnr_18),
+            .reset_out(reset_rx_pcs_clk_c18_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_18
           (
             .clk(rx_pcs_clk_c18),
@@ -5593,8 +6176,8 @@ generate if (MAX_CHANNELS > 18)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[18]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[18])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_18.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_18.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -5630,7 +6213,7 @@ generate if (MAX_CHANNELS > 18)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[18]),
             .rx_runningdisp(rx_runningdisp[18]),
             .pll_powerdown(gxb_pwrdn_in_sig[18]),
-            .pll_locked(pll_locked_18)
+            .pll_locked(pll_locked_18) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_18.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -5645,7 +6228,6 @@ else
     assign link_status[18] = 1'b0;
     assign led_disp_err_18 = 1'b0;
     assign txp_18 = 1'b0;
-	assign pcs_clk_c18 = 1'b0;
     end      
 endgenerate
 
@@ -5659,7 +6241,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_19,gxb_pwrdn_in_sig_clk_19;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 19)
-    begin      
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_19)
         begin
           if (gxb_pwrdn_in_19 == 1) begin
@@ -5668,7 +6250,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 19)
           end else begin
             data_in_19 <= 1'b0;
             gxb_pwrdn_in_sig_clk_19 <= data_in_19;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[19] = gxb_pwrdn_in_19;
         assign pcs_pwrdn_out_19 = pcs_pwrdn_out_sig[19];
@@ -5676,26 +6258,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 19)
 else
     begin
         assign gxb_pwrdn_in_sig[19] = pcs_pwrdn_out_sig[19];
-		assign pcs_pwrdn_out_19 = 1'b0;
+        assign pcs_pwrdn_out_19 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_19 = gxb_pwrdn_in_sig[19];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 19)
     begin  
         wire    locked_signal_19;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_19(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_19),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_19),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -5717,10 +6298,11 @@ generate if (MAX_CHANNELS > 19)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_19_reset_sync_0 (
-        .clk(rx_pcs_clk_c19),
-        .reset_in(rx_digitalreset_sqcnr_19),
-        .reset_out(reset_rx_pcs_clk_c19_int)
+            .clk(rx_pcs_clk_c19),
+            .reset_in(rx_digitalreset_sqcnr_19),
+            .reset_out(reset_rx_pcs_clk_c19_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_19
           (
             .clk(rx_pcs_clk_c19),
@@ -5747,8 +6329,8 @@ generate if (MAX_CHANNELS > 19)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[19]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[19])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_19.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_19.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -5777,14 +6359,14 @@ generate if (MAX_CHANNELS > 19)
             .tx_clkout (tx_pcs_clk_c19),
             .tx_ctrlenable (tx_kchar_19),
             .tx_datain (tx_frame_19),
-            .tx_dataout (txp_19),
             .rx_freqlocked (rx_freqlocked_19),
+            .tx_dataout (txp_19),
             .tx_digitalreset (tx_digitalreset_sqcnr_19),
             .rx_rmfifodatadeleted(rx_rmfifodatadeleted[19]),
             .rx_rmfifodatainserted(rx_rmfifodatainserted[19]),
             .rx_runningdisp(rx_runningdisp[19]),
             .pll_powerdown(gxb_pwrdn_in_sig[19]),
-            .pll_locked(pll_locked_19)
+            .pll_locked(pll_locked_19) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_19.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -5799,7 +6381,6 @@ else
     assign link_status[19] = 1'b0;
     assign led_disp_err_19 = 1'b0;
     assign txp_19 = 1'b0;
-	assign pcs_clk_c19 = 1'b0;
     end      
 endgenerate
 
@@ -5813,7 +6394,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_20,gxb_pwrdn_in_sig_clk_20;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 20)
-    begin          
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_20)
         begin
           if (gxb_pwrdn_in_20 == 1) begin
@@ -5822,7 +6403,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 20)
           end else begin
             data_in_20 <= 1'b0;
             gxb_pwrdn_in_sig_clk_20 <= data_in_20;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[20] = gxb_pwrdn_in_20;
         assign pcs_pwrdn_out_20 = pcs_pwrdn_out_sig[20];
@@ -5830,26 +6411,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 20)
 else
     begin
         assign gxb_pwrdn_in_sig[20] = pcs_pwrdn_out_sig[20];
-		assign pcs_pwrdn_out_20 = 1'b0;
+        assign pcs_pwrdn_out_20 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_20 = gxb_pwrdn_in_sig[20];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 20)
     begin  
         wire    locked_signal_20;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_20(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_20),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_20),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -5871,10 +6451,11 @@ generate if (MAX_CHANNELS > 20)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_20_reset_sync_0 (
-        .clk(rx_pcs_clk_c20),
-        .reset_in(rx_digitalreset_sqcnr_20),
-        .reset_out(reset_rx_pcs_clk_c20_int)
+            .clk(rx_pcs_clk_c20),
+            .reset_in(rx_digitalreset_sqcnr_20),
+            .reset_out(reset_rx_pcs_clk_c20_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_20
           (
             .clk(rx_pcs_clk_c20),
@@ -5901,8 +6482,8 @@ generate if (MAX_CHANNELS > 20)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[20]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[20])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_20.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_20.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -5938,7 +6519,7 @@ generate if (MAX_CHANNELS > 20)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[20]),
             .rx_runningdisp(rx_runningdisp[20]),
             .pll_powerdown(gxb_pwrdn_in_sig[20]),
-            .pll_locked(pll_locked_20)
+            .pll_locked(pll_locked_20) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_20.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -5953,7 +6534,6 @@ else
     assign link_status[20] = 1'b0;
     assign led_disp_err_20 = 1'b0;
     assign txp_20 = 1'b0;
-	assign pcs_clk_c20 = 1'b0;
     end      
 endgenerate
 
@@ -5967,7 +6547,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_21,gxb_pwrdn_in_sig_clk_21;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 21)
-    begin     
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_21)
         begin
           if (gxb_pwrdn_in_21 == 1) begin
@@ -5976,7 +6556,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 21)
           end else begin
             data_in_21 <= 1'b0;
             gxb_pwrdn_in_sig_clk_21 <= data_in_21;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[21] = gxb_pwrdn_in_21;
         assign pcs_pwrdn_out_21 = pcs_pwrdn_out_sig[21];
@@ -5984,26 +6564,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 21)
 else
     begin
         assign gxb_pwrdn_in_sig[21] = pcs_pwrdn_out_sig[21];
-		assign pcs_pwrdn_out_21 = 1'b0;
+        assign pcs_pwrdn_out_21 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_21 = gxb_pwrdn_in_sig[21];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 21)
     begin  
         wire    locked_signal_21;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_21(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_21),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_21),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -6012,7 +6591,7 @@ generate if (MAX_CHANNELS > 21)
             .rx_analogreset(rx_analogreset_sqcnr_21),// output
             .rx_digitalreset(rx_digitalreset_sqcnr_21),// output
             .gxb_powerdown(gxb_powerdown_sqcnr_21),// output
-            .pll_is_locked(pll_locked_21),
+            .pll_is_locked(locked_signal_21),
             .rx_is_lockedtodata(rx_freqlocked_21),
             .manual_mode(1'b0),
             .rx_oc_busy(reconfig_busy_21)
@@ -6025,10 +6604,11 @@ generate if (MAX_CHANNELS > 21)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_21_reset_sync_0 (
-        .clk(rx_pcs_clk_c21),
-        .reset_in(rx_digitalreset_sqcnr_21),
-        .reset_out(reset_rx_pcs_clk_c21_int)
+            .clk(rx_pcs_clk_c21),
+            .reset_in(rx_digitalreset_sqcnr_21),
+            .reset_out(reset_rx_pcs_clk_c21_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_21
           (
             .clk(rx_pcs_clk_c21),
@@ -6055,8 +6635,8 @@ generate if (MAX_CHANNELS > 21)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[21]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[21])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_21.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_21.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -6092,7 +6672,7 @@ generate if (MAX_CHANNELS > 21)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[21]),
             .rx_runningdisp(rx_runningdisp[21]),
             .pll_powerdown(gxb_pwrdn_in_sig[21]),
-            .pll_locked(pll_locked_21)
+            .pll_locked(pll_locked_21) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_21.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -6107,7 +6687,6 @@ else
     assign link_status[21] = 1'b0;
     assign led_disp_err_21 = 1'b0;
     assign txp_21 = 1'b0;
-	assign pcs_clk_c21 = 1'b0;
     end      
 endgenerate
 
@@ -6121,7 +6700,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_22,gxb_pwrdn_in_sig_clk_22;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 22)
-    begin   
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_22)
         begin
           if (gxb_pwrdn_in_22 == 1) begin
@@ -6130,7 +6709,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 22)
           end else begin
             data_in_22 <= 1'b0;
             gxb_pwrdn_in_sig_clk_22 <= data_in_22;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[22] = gxb_pwrdn_in_22;
         assign pcs_pwrdn_out_22 = pcs_pwrdn_out_sig[22];
@@ -6138,26 +6717,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 22)
 else
     begin
         assign gxb_pwrdn_in_sig[22] = pcs_pwrdn_out_sig[22];
-		assign pcs_pwrdn_out_22 = 1'b0;
+        assign pcs_pwrdn_out_22 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_22 = gxb_pwrdn_in_sig[22];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 22)
     begin  
         wire    locked_signal_22;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_22(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_22),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_22),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -6166,7 +6744,7 @@ generate if (MAX_CHANNELS > 22)
             .rx_analogreset(rx_analogreset_sqcnr_22),// output
             .rx_digitalreset(rx_digitalreset_sqcnr_22),// output
             .gxb_powerdown(gxb_powerdown_sqcnr_22),// output
-            .pll_is_locked(pll_locked_22),
+            .pll_is_locked(locked_signal_22),
             .rx_is_lockedtodata(rx_freqlocked_22),
             .manual_mode(1'b0),
             .rx_oc_busy(reconfig_busy_22)
@@ -6179,10 +6757,11 @@ generate if (MAX_CHANNELS > 22)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_22_reset_sync_0 (
-        .clk(rx_pcs_clk_c22),
-        .reset_in(rx_digitalreset_sqcnr_22),
-        .reset_out(reset_rx_pcs_clk_c22_int)
+            .clk(rx_pcs_clk_c22),
+            .reset_in(rx_digitalreset_sqcnr_22),
+            .reset_out(reset_rx_pcs_clk_c22_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_22
           (
             .clk(rx_pcs_clk_c22),
@@ -6209,8 +6788,8 @@ generate if (MAX_CHANNELS > 22)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[22]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[22])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_22.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_22.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -6246,7 +6825,7 @@ generate if (MAX_CHANNELS > 22)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[22]),
             .rx_runningdisp(rx_runningdisp[22]),
             .pll_powerdown(gxb_pwrdn_in_sig[22]),
-            .pll_locked(pll_locked_22)
+            .pll_locked(pll_locked_22) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_22.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -6261,7 +6840,6 @@ else
     assign link_status[22] = 1'b0;
     assign led_disp_err_22 = 1'b0;
     assign txp_22 = 1'b0;
-	assign pcs_clk_c22 = 1'b0;
     end      
 endgenerate
 
@@ -6275,7 +6853,7 @@ endgenerate
 // ---------------------------------------------
 reg data_in_23,gxb_pwrdn_in_sig_clk_23;
 generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 23)
-    begin          
+    begin        
         always @(posedge clk or posedge gxb_pwrdn_in_23)
         begin
           if (gxb_pwrdn_in_23 == 1) begin
@@ -6284,7 +6862,7 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 23)
           end else begin
             data_in_23 <= 1'b0;
             gxb_pwrdn_in_sig_clk_23 <= data_in_23;
-          end	
+          end   
         end
         assign gxb_pwrdn_in_sig[23] = gxb_pwrdn_in_23;
         assign pcs_pwrdn_out_23 = pcs_pwrdn_out_sig[23];
@@ -6292,26 +6870,25 @@ generate if (EXPORT_PWRDN == 1 && MAX_CHANNELS > 23)
 else
     begin
         assign gxb_pwrdn_in_sig[23] = pcs_pwrdn_out_sig[23];
-		assign pcs_pwrdn_out_23 = 1'b0;
+        assign pcs_pwrdn_out_23 = 1'b0;
         always@(*) begin
             gxb_pwrdn_in_sig_clk_23 = gxb_pwrdn_in_sig[23];
-        end
-    end      
+        end      
+    end
 endgenerate
+
 
 generate if (MAX_CHANNELS > 23)
     begin  
         wire    locked_signal_23;
-    // Reset logic used to reset the PMA blocks
-    // ----------------------------------------  
     //  ALTGX Reset Sequencer
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst_23(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset|gxb_pwrdn_in_sig_clk_23),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk_23),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),   
+            .powerdown_all(reset_sync),
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status
@@ -6333,10 +6910,11 @@ generate if (MAX_CHANNELS > 23)
         // Aligned Rx_sync from gxb
         // -------------------------------
         altera_tse_reset_synchronizer ch_23_reset_sync_0 (
-        .clk(rx_pcs_clk_c23),
-        .reset_in(rx_digitalreset_sqcnr_23),
-        .reset_out(reset_rx_pcs_clk_c23_int)
+            .clk(rx_pcs_clk_c23),
+            .reset_in(rx_digitalreset_sqcnr_23),
+            .reset_out(reset_rx_pcs_clk_c23_int)
         );
+
         altera_tse_gxb_aligned_rxsync the_altera_tse_gxb_aligned_rxsync_23
           (
             .clk(rx_pcs_clk_c23),
@@ -6363,8 +6941,8 @@ generate if (MAX_CHANNELS > 23)
             .altpcs_rmfifodatainserted(pcs_rx_rmfifodatainserted[23]),
             .altpcs_carrierdetect(pcs_rx_carrierdetected[23])
            ) ;
-		defparam
-		the_altera_tse_gxb_aligned_rxsync_23.DEVICE_FAMILY = DEVICE_FAMILY;    
+                defparam
+                the_altera_tse_gxb_aligned_rxsync_23.DEVICE_FAMILY = DEVICE_FAMILY;    
 
         // Altgxb in GIGE mode
         // --------------------
@@ -6400,7 +6978,7 @@ generate if (MAX_CHANNELS > 23)
             .rx_rmfifodatainserted(rx_rmfifodatainserted[23]),
             .rx_runningdisp(rx_runningdisp[23]),
             .pll_powerdown(gxb_pwrdn_in_sig[23]),
-            .pll_locked(pll_locked_23)
+            .pll_locked(pll_locked_23) 
           );
    defparam
         the_altera_tse_gxb_gige_inst_23.ENABLE_ALT_RECONFIG = ENABLE_ALT_RECONFIG,
@@ -6415,7 +6993,6 @@ else
     assign link_status[23] = 1'b0;
     assign led_disp_err_23 = 1'b0;
     assign txp_23 = 1'b0;
-	assign pcs_clk_c23 = 1'b0;
     end      
 endgenerate
 

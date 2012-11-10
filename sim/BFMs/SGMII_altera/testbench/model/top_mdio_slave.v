@@ -7,8 +7,8 @@
 // $Source: $
 //
 // $Revision: #1 $
-// $Date: 2011/11/10 $
-// Check in by : $Author: max $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : SKNg/TTChong
 //
 // Project     : Triple Speed Ethernet - 10/100/1000 MAC

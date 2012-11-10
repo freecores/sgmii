@@ -7,8 +7,8 @@
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/RTL/Top_level_modules/altera_tse_gxb_gige_inst.v,v $
 //
 // $Revision: #1 $
-// $Date: 2011/11/10 $
-// Check in by : $Author: max $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : Siew Kong NG
 //
 // Project     : Triple Speed Ethernet - 1000 BASE-X PCS
@@ -153,7 +153,6 @@ parameter ENABLE_SGMII            = 1;            //  Use to determine rate matc
             .rx_analogreset (rx_analogreset),
             .rx_cruclk (rx_cruclk),
             .rx_ctrldetect (rx_ctrldetect),
-            .rx_clkout (rx_clkout),
             .rx_datain (rx_datain),
             .rx_dataout (rx_dataout),
             .rx_digitalreset (rx_digitalreset),
@@ -182,6 +181,8 @@ parameter ENABLE_SGMII            = 1;            //  Use to determine rate matc
 
           assign reconfig_togxb_alt2gxb = wire_reconfig_togxb[2:0];
           assign wire_reconfig_fromgxb = {{16{1'b0}}, reconfig_fromgxb_alt2gxb};
+          assign rx_clkout  = tx_clkout;
+          
 	
 	end
 	endgenerate
@@ -252,7 +253,6 @@ parameter ENABLE_SGMII            = 1;            //  Use to determine rate matc
             .rx_analogreset (rx_analogreset),
             .rx_cruclk (rx_cruclk),
             .rx_ctrldetect (rx_ctrldetect),
-            .rx_clkout (rx_clkout),
             .rx_datain (rx_datain),
             .rx_dataout (rx_dataout),
             .rx_digitalreset (rx_digitalreset),
@@ -277,7 +277,8 @@ parameter ENABLE_SGMII            = 1;            //  Use to determine rate matc
           );
           defparam
               the_altera_tse_alt4gxb_gige.starting_channel_number = STARTING_CHANNEL_NUMBER;
-	
+            
+            assign rx_clkout  = tx_clkout;
 	end
 	endgenerate
     
@@ -344,7 +345,6 @@ parameter ENABLE_SGMII            = 1;            //  Use to determine rate matc
             .reconfig_togxb(wire_reconfig_togxb),
             .rx_analogreset (rx_analogreset),
             .rx_ctrldetect (rx_ctrldetect),
-            .rx_clkout (rx_clkout),
             .rx_datain (rx_datain),
             .rx_dataout (rx_dataout),
             .rx_digitalreset (rx_digitalreset),
@@ -369,6 +369,8 @@ parameter ENABLE_SGMII            = 1;            //  Use to determine rate matc
           );
 		  defparam
               the_altera_tse_alt_gx_civgx.starting_channel_number = STARTING_CHANNEL_NUMBER;
+              
+            assign rx_clkout  = tx_clkout;
 	end
 	endgenerate
     

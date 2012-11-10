@@ -7,8 +7,8 @@
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/RTL/Top_level_modules/altera_tse_mac_pcs_pma_gige.v,v $
 //
 // $Revision: #1 $
-// $Date: 2011/11/10 $
-// Check in by : $Author: max $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : Arul Paniandi
 //
 // Project     : Triple Speed Ethernet
@@ -389,15 +389,26 @@ parameter SYNCHRONIZER_DEPTH     = 3;	  	//  Number of synchronizer
     	altera_tse_mac_pcs_pma_strx_gx_ena_inst.SYNCHRONIZER_DEPTH = SYNCHRONIZER_DEPTH,
         altera_tse_mac_pcs_pma_strx_gx_ena_inst.ENABLE_MAC_TX_VLAN = ENABLE_MAC_TX_VLAN;
 
-reg reset_p1, reset_p2;
-reg reset_posedge;
-always@(posedge clk)
-begin
-    reset_p1 <= reset;
-    reset_p2 <= reset_p1;
-    reset_posedge <= reset_p1 & ~reset_p2;
-end
+// Based on PHYIP , when user assert reset - it hold the reset sequencer block in reset.
+//                , reset sequencing only start then reset_sequnece end.
+wire reset_sync;
+reg  reset_start;
 
+ altera_tse_reset_synchronizer reset_sync_u0 (
+    .clk(clk),
+    .reset_in(reset),
+    .reset_out(reset_sync)
+    );
+        
+always@(posedge clk or posedge reset_sync) begin
+    if (reset_sync) begin
+        reset_start <= 1'b1;
+    end
+    else begin
+        reset_start <= 1'b0;
+    end
+end
+        
 // Export powerdown signal or wire it internally
 // ---------------------------------------------
 reg data_in_d1, gxb_pwrdn_in_sig_clk;
@@ -435,10 +446,10 @@ endgenerate
         altera_tse_reset_sequencer altera_tse_reset_sequencer_inst(
             // User inputs and outputs
             .clock(clk),
-            .reset_all(reset | gxb_pwrdn_in_sig_clk),
+            .reset_all(reset_start | gxb_pwrdn_in_sig_clk),
             //.reset_tx_digital(reset_ref_clk),
             //.reset_rx_digital(reset_ref_clk),
-            .powerdown_all(reset_posedge),    
+            .powerdown_all(reset_sync),    
             .tx_ready(), // output
             .rx_ready(), // output
             // I/O transceiver and status

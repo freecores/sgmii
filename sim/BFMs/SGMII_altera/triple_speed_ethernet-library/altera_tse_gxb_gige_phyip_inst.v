@@ -38,41 +38,42 @@
 //agreement for further details.
 
 module altera_tse_gxb_gige_phyip_inst (
-	phy_mgmt_clk,
-	phy_mgmt_clk_reset,
-	phy_mgmt_address,
-	phy_mgmt_read,
-	phy_mgmt_readdata,
-	phy_mgmt_waitrequest,
-	phy_mgmt_write,
-	phy_mgmt_writedata,
-	tx_ready,
-	rx_ready,
-	pll_ref_clk,
-	pll_locked,
-	tx_serial_data,
-	rx_serial_data,
-	rx_runningdisp,
-	rx_disperr,
-	rx_errdetect,
-	rx_patterndetect,
-	rx_syncstatus,
-	tx_clkout,
-	rx_clkout,
-	tx_parallel_data,
-	tx_datak,
-	rx_parallel_data,
-	rx_datak,
-	rx_rlv,
-	rx_recovclkout,
-	rx_rmfifodatadeleted,
-	rx_rmfifodatainserted,
-	reconfig_togxb,
-	reconfig_fromgxb
+        phy_mgmt_clk,
+        phy_mgmt_clk_reset,
+        phy_mgmt_address,
+        phy_mgmt_read,
+        phy_mgmt_readdata,
+        phy_mgmt_waitrequest,
+        phy_mgmt_write,
+        phy_mgmt_writedata,
+        tx_ready,
+        rx_ready,
+        pll_ref_clk,
+        pll_locked,
+        tx_serial_data,
+        rx_serial_data,
+        rx_runningdisp,
+        rx_disperr,
+        rx_errdetect,
+        rx_patterndetect,
+        rx_syncstatus,
+        tx_clkout,
+        rx_clkout,
+        tx_parallel_data,
+        tx_datak,
+        rx_parallel_data,
+        rx_datak,
+        rx_rlv,
+        rx_recovclkout,
+        rx_rmfifodatadeleted,
+        rx_rmfifodatainserted,
+        reconfig_togxb,
+        reconfig_fromgxb
 );
 parameter DEVICE_FAMILY           = "STRATIXV";    //  The device family the the core is targetted for.
 parameter ENABLE_ALT_RECONFIG     = 0;
 parameter ENABLE_SGMII            = 1;            //  Use to determine rate match FIFO in ALTGX GIGE mode
+parameter ENABLE_DET_LATENCY      = 0;
 
 input phy_mgmt_clk;
 input phy_mgmt_clk_reset;
@@ -114,24 +115,24 @@ output [91:0]reconfig_fromgxb;
 
 
   generate if (ENABLE_ALT_RECONFIG == 0)
-		begin
-	
-			 assign wire_reconfig_togxb = 140'd0;
-			 assign reconfig_fromgxb = 92'd0;        
+                begin
+        
+                         assign wire_reconfig_togxb = 140'd0;
+                         assign reconfig_fromgxb = 92'd0;        
  
-		end
+                end
   else
-		begin
-	
-			 assign wire_reconfig_togxb = reconfig_togxb;
-			 assign reconfig_fromgxb = wire_reconfig_fromgxb;
+                begin
+        
+                         assign wire_reconfig_togxb = reconfig_togxb;
+                         assign reconfig_fromgxb = wire_reconfig_fromgxb;
  
-		end
+                end
   endgenerate
 
-	generate if (ENABLE_SGMII == 0)
-	begin
-	
+        generate if (ENABLE_SGMII == 0)
+        begin
+        
          altera_tse_phyip_gxb the_altera_tse_phyip_gxb (
         .phy_mgmt_clk(phy_mgmt_clk),                 //       phy_mgmt_clk.clk
         .phy_mgmt_clk_reset(phy_mgmt_clk_reset),     // phy_mgmt_clk_reset.reset
@@ -153,7 +154,6 @@ output [91:0]reconfig_fromgxb;
         .rx_patterndetect(rx_patterndetect),         //   rx_patterndetect.export
         .rx_syncstatus(rx_syncstatus),               //       rx_syncstatus.export
         .tx_clkout(tx_clkout),                       //          tx_clkout.clk
-        .rx_clkout(rx_clkout),                       //         rx_clkout.clk
         .tx_parallel_data(tx_parallel_data),         //  tx_parallel_data.data
         .tx_datak(tx_datak),                         //          tx_datak.data
         .rx_parallel_data(rx_parallel_data),         //  rx_parallel_data.data
@@ -165,13 +165,14 @@ output [91:0]reconfig_fromgxb;
         .reconfig_to_xcvr(wire_reconfig_togxb),
         .reconfig_from_xcvr(wire_reconfig_fromgxb)
     );
+        assign rx_clkout  = tx_clkout;
 
-	end
-	endgenerate
+        end
+        endgenerate
     
-   generate if (ENABLE_SGMII == 1)
-	begin
-	
+   generate if ((ENABLE_SGMII == 1) && (ENABLE_DET_LATENCY == 0))
+        begin
+        
         altera_tse_phyip_gxb_wo_rmfifo the_altera_tse_phyip_gxb_wo_rmfifo (
         .phy_mgmt_clk(phy_mgmt_clk),                 //       phy_mgmt_clk.clk
         .phy_mgmt_clk_reset(phy_mgmt_clk_reset),     // phy_mgmt_clk_reset.reset
@@ -207,6 +208,52 @@ output [91:0]reconfig_fromgxb;
 
         assign rx_rmfifodatadeleted = 1'b0;
         assign rx_rmfifodatainserted = 1'b0;
+
+    end
+    endgenerate
+    
+    
+    
+    generate if ((ENABLE_SGMII == 1) && (ENABLE_DET_LATENCY == 1))
+        begin
+        
+        altera_tse_phyip_det_latency the_altera_tse_phyip_gxb_wo_rmfifo (
+        .phy_mgmt_clk(phy_mgmt_clk),                 //       phy_mgmt_clk.clk
+        .phy_mgmt_clk_reset(phy_mgmt_clk_reset),     // phy_mgmt_clk_reset.reset
+        .phy_mgmt_address(phy_mgmt_address),         //           phy_mgmt.address
+        .phy_mgmt_read(phy_mgmt_read),               //                   .read
+        .phy_mgmt_readdata(phy_mgmt_readdata),       //                   .readdata
+        .phy_mgmt_waitrequest(phy_mgmt_waitrequest), //                   .waitrequest
+        .phy_mgmt_write(phy_mgmt_write),             //                   .write
+        .phy_mgmt_writedata(phy_mgmt_writedata),     //                   .writedata
+        .tx_ready(tx_ready),                         //           tx_ready.export
+        .rx_ready(rx_ready),                         //           rx_ready.export
+        .pll_ref_clk(pll_ref_clk),                   //        pll_ref_clk.clk
+        .pll_locked(pll_locked),                     //         pll_locked.export
+        .tx_serial_data(tx_serial_data),             //     tx_serial_data.export
+        .rx_serial_data(rx_serial_data),             //     rx_serial_data.export
+        .rx_runningdisp(rx_runningdisp),             //     rx_runningdisp.export
+        .rx_disperr(rx_disperr),                     //         rx_disperr.export
+        .rx_errdetect(rx_errdetect),                 //       rx_errdetect.export
+        .rx_patterndetect(rx_patterndetect),         //   rx_patterndetect.export
+        .rx_syncstatus(rx_syncstatus),               //      rx_syncstatus.export
+        .tx_clkout(tx_clkout),                       //         tx_clkout.clk
+        .rx_clkout(rx_clkout),                       //         rx_clkout.clk
+        .tx_parallel_data(tx_parallel_data),         //  tx_parallel_data.data
+        .tx_datak(tx_datak),                         //          tx_datak.data
+        .rx_parallel_data(rx_parallel_data),         //  rx_parallel_data.data
+        .rx_datak(rx_datak),                         //          rx_datak.data
+        .rx_rlv(rx_rlv), 
+        .reconfig_to_xcvr(wire_reconfig_togxb),
+        .reconfig_from_xcvr(wire_reconfig_fromgxb),
+        .rx_bitslipboundaryselectout()
+        //.rx_recovered_clk(rx_recovclkout),
+    );
+
+
+        assign rx_rmfifodatadeleted = 1'b0;
+        assign rx_rmfifodatainserted = 1'b0;
+        assign rx_recovclkout = rx_clkout; // work around since this port is not available in Deterministic Latency PHY IP
 
     end
     endgenerate

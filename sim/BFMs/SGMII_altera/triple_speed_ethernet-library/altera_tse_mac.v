@@ -7,8 +7,8 @@
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/RTL/Top_level_modules/altera_tse_mac.v,v $
 //
 // $Revision: #1 $
-// $Date: 2011/11/10 $
-// Check in by : $Author: max $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : Arul Paniandi
 //
 // Project     : Triple Speed Ethernet

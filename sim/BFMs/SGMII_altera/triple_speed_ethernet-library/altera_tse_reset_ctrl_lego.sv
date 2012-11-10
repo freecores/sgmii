@@ -87,7 +87,7 @@ module	altera_tse_reset_ctrl_lego
 	assign rinit_next = spulse | (rinit & (rhold | ~rdonei | rdpulse)) | timed_reset_in_progress;
 	always @(posedge clock or posedge aclr)
 		if (aclr == 1'b1)
-			rinit <= 0;
+            rinit <= 1;
 		else
 			rinit <= rinit_next;
 
@@ -176,7 +176,7 @@ module	altera_tse_reset_ctrl_lego
 			// a single-cycle reset pulse needs 1 register
 			always @(posedge clock or posedge aclr)
 				if (aclr == 1'b1)
-					zspulse <= 0;
+                    zspulse <= 1;
 				else
 					zspulse <= spulse;
 		else begin
@@ -184,7 +184,7 @@ module	altera_tse_reset_ctrl_lego
 			always @(posedge clock or posedge aclr)
 			begin
 				if (aclr == 1'b1)
-					zspulse <= 0;
+                    zspulse <= {rhc_bits + 1 { 1'b1}};
 				else if (spulse == 1)
 					zspulse <= rhc_load_constant[rhc_bits:0];
 				else if (zspulse[rhc_bits] == 1)

@@ -7,8 +7,8 @@
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/RTL/MAC/mac/timing_adapter/altera_tse_timing_adapter_fifo8.v,v $
 //
 // $Revision: #1 $
-// $Date: 2011/11/10 $
-// Check in by : $Author: max $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : SKNg
 //
 // Project     : Triple Speed Ethernet - 10/100/1000 MAC

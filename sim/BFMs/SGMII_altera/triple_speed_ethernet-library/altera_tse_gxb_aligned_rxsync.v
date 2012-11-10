@@ -7,8 +7,8 @@
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/RTL/strxii_pcs/verilog/altera_tse_alt2gxb_aligned_rxsync.v,v $
 //
 // $Revision: #1 $
-// $Date: 2011/11/10 $
-// Check in by : $Author: max $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : Siew Kong NG
 //
 // Project     : Triple Speed Ethernet - 1000 BASE-X PCS
@@ -50,6 +50,7 @@ module altera_tse_gxb_aligned_rxsync (
   output reg altpcs_rmfifodatainserted,
   output reg altpcs_carrierdetect) ;
   parameter DEVICE_FAMILY         = "ARRIAGX";    //  The device family the the core is targetted for. 
+  parameter ENABLE_DET_LATENCY      = 0;
 
   //-------------------------------------------------------------------------------
   // intermediate wires
@@ -103,7 +104,7 @@ module altera_tse_gxb_aligned_rxsync (
     
     end 
 	
-generate if ( DEVICE_FAMILY == "STRATIXIIGX" || DEVICE_FAMILY == "ARRIAGX"  || DEVICE_FAMILY == "STRATIXV" || DEVICE_FAMILY == "ARRIAV")
+generate if ( DEVICE_FAMILY == "STRATIXIIGX" || DEVICE_FAMILY == "ARRIAGX" || (DEVICE_FAMILY == "STRATIXV" && ENABLE_DET_LATENCY == 1))
 begin          
 		always @ (posedge reset or posedge clk)
 		begin
@@ -140,7 +141,7 @@ begin
 		end
 		assign altpcs_sync              = alt_sync_reg1;	      
 end
-else if ( DEVICE_FAMILY == "STRATIXIV" || DEVICE_FAMILY == "ARRIAIIGX" || DEVICE_FAMILY == "CYCLONEIVGX" || DEVICE_FAMILY == "HARDCOPYIV" || DEVICE_FAMILY == "ARRIAIIGZ")
+else if ( DEVICE_FAMILY == "STRATIXIV" || DEVICE_FAMILY == "ARRIAIIGX" || DEVICE_FAMILY == "CYCLONEIVGX" || DEVICE_FAMILY == "HARDCOPYIV" || DEVICE_FAMILY == "ARRIAIIGZ"   || DEVICE_FAMILY == "STRATIXV" || DEVICE_FAMILY == "ARRIAV" || DEVICE_FAMILY == "CYCLONEV")
 begin
 	always @ (posedge reset or posedge clk)
     begin

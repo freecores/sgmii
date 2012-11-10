@@ -28,7 +28,7 @@
 # command in the Quartus II TCL console:
 # set_global_assignment -name SDC_FILE "sgmii"_constraints.sdc
 #
-# Generated on Sat Feb 25 11:16:45 SGT 2012
+# Generated on Sat Nov 10 09:38:18 SGT 2012
 #
 #####################################################################################
 

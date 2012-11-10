@@ -7,8 +7,8 @@
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/testbench/PCS/verilog/tb_pcs_pma_powerdown.v,v $
 //
 // $Revision: #1 $
-// $Date: 2011/11/10 $
-// Check in by : $Author: max $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : SKNg/TTChong
 //
 // Project     : Triple Speed Ethernet - 1000 Base-X PCS / SGMII
@@ -35,7 +35,7 @@ module tb ;
 //  WARNING: DO NOT MODIFY THESE PARAMETERS
 //  -------------------------------
 	parameter PHY_IDENTIFIER=32'h00000000;
-	parameter DEV_VERSION=16'h0b01;
+	parameter DEV_VERSION=16'h0c00;
 	parameter ENABLE_SGMII=1;
 	parameter SYNCHRONIZER_DEPTH=3;
 	parameter DEVICE_FAMILY="CYCLONEIVGX";
@@ -429,9 +429,9 @@ assign tx_clk_sig = (ENABLE_SGMII == 0)|(tx_en1 == 1'b1 && tx_en2 == 1'b1) ? tx_
 	 .reconfig_togxb(reconfig_togxb),
 	 .reconfig_fromgxb(reconfig_fromgxb),
 	 .reconfig_busy(reconfig_busy),
-	 .led_char_err(led_char_err),
-	 .led_link(led_link),
 	 .led_disp_err(led_disp_err),
+	 .led_link(led_link),
+	 .led_char_err(led_char_err),
 	 .gxb_cal_blk_clk(ref_clk)
 	);
 

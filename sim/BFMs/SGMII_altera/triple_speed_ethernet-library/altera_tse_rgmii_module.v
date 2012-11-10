@@ -7,8 +7,8 @@
 // $Source: /ipbu/cvs/sio/projects/TriSpeedEthernet/src/RTL/MAC/mac/rgmii/altera_tse_rgmii_module.v,v $
 //
 // $Revision: #1 $
-// $Date: 2011/11/10 $
-// Check in by : $Author: max $
+// $Date: 2012/06/21 $
+// Check in by : $Author: swbranch $
 // Author      : Arul Paniandi
 //
 // Project     : Triple Speed Ethernet - 10/100/1000 MAC

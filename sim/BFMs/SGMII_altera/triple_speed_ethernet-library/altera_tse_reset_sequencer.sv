@@ -51,7 +51,6 @@ wire pll_is_locked_r;           // pll_is_locked resynchronized
 wire rx_oc_busy_r;              // rx_oc_busy resynchronized 
 wire rx_is_lockedtodata_r;      // rx_is_lockedtodata resynchronized
 wire manual_mode_r;             // manual_mode resynchonized
-reg  reset_all_r = 1'b0;        // reset_all_r delayed by one clock (for edge detect)
 
 wire sdone_lego_pll_powerdown;  // 'sequence done' output of pll_powerdown lego
 wire sdone_lego_tx_digitalreset;// 'sequence done' output of tx_digitalreset lego
@@ -61,6 +60,7 @@ wire wire_tx_digital_only_reset;// reset output for TX digital-only
 wire wire_rx_digital_only_reset;// reset output for RX digital-only
 wire wire_tx_digitalreset;      // TX digital full-reset source
 wire wire_rx_digitalreset;      // RX digital full-reset source
+wire wire_rx_digital_retrigger; // Trigger new RX digital sequence after main sequence completes, and lose lock-to-data
 
 
 // Resynchronize input signals
@@ -72,12 +72,8 @@ altera_tse_xcvr_resync #(
         .q      ({pll_is_locked_r,rx_oc_busy_r,rx_is_lockedtodata_r,manual_mode_r})
 );
 
-// Delay reset_all by one clock for edge detect
-always @(posedge clock)
-  reset_all_r <=  reset_all; 
-
+  
 // First reset ctrl sequencer lego is for pll_powerdown generation
-(* ALTERA_ATTRIBUTE = {"REMOVE_DUPLICATE_REGISTERS=OFF;-name MERGE_TX_PLL_DRIVEN_BY_REGISTERS_WITH_SAME_CLEAR ON -to \"lego_pll_powerdown:zpulse\""} *)
 altera_tse_reset_ctrl_lego #(
         .reset_hold_cycles(t_pll_powerdown) // hold pll_powerdown for 1us
  ) lego_pll_powerdown ( .clock(clock),
@@ -113,7 +109,7 @@ altera_tse_reset_ctrl_lego #(
         .reset_hold_til_rdone(1),       // hold until rdone arrives for this test case
         .sdone_delay_cycles(t_ltd_auto) // hold rx_digitalreset for 4us
  ) lego_rx_digitalreset (       .clock(clock),
-        .start(~manual_mode & ((reset_all & ~reset_all_r) | ~rx_is_lockedtodata_r)),
+        .start(~manual_mode & reset_all | wire_rx_digital_retrigger),
         .aclr(powerdown_all),
         .reset(wire_rx_digitalreset),
         .rdone(sdone_lego_rx_analogreset & rx_is_lockedtodata_r),
@@ -133,7 +129,7 @@ altera_tse_reset_ctrl_lego #(
 altera_tse_reset_ctrl_lego #(
         .reset_hold_cycles(3)   // hold 2 parallel clock cycles (assumes sysclk slower or same freq as parallel clock)
  ) lego_rx_digitalonly (        .clock(clock),
-        .start(reset_rx_digital | (reset_all & ~manual_mode)),
+        .start(reset_rx_digital | (reset_all & ~manual_mode) | wire_rx_digital_retrigger),
         .aclr(powerdown_all),
         .reset(wire_rx_digital_only_reset),
         .rdone(sdone_lego_rx_digitalreset),
@@ -142,6 +138,10 @@ altera_tse_reset_ctrl_lego #(
 // digital resets have 2 possible sources: full-reset or digital-only
 assign tx_digitalreset = wire_tx_digitalreset | wire_tx_digital_only_reset;
 assign rx_digitalreset = wire_rx_digitalreset | wire_rx_digital_only_reset;
+
+// re-trigger RX digital sequence when main sequence is complete (indicated by sdone_lego_rx_digitalreset)
+// not manual mode, and lose lock-to-data
+assign wire_rx_digital_retrigger = ~manual_mode & sdone_lego_rx_digitalreset & ~rx_is_lockedtodata_r;
 
 // Quad power-down
 assign gxb_powerdown = powerdown_all;
