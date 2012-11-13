@@ -5,7 +5,8 @@ module mAltA5GXlvds (
 	output 	o_SerTx,			
 	
 	input 	i_RefClk125M,
-	output 	o_CoreClk,				
+	output 	o_RxClk,	
+	output 	o_TxClk,	
 	input 	i_GxBPwrDwn,
 	input 	i_XcverDigitalRst,
     output 	o_PllLocked,
@@ -39,7 +40,7 @@ module mAltA5GXlvds (
 	.o10_Dout			(w10_txdata),			//abcdeifghj
 	.o_Rd				(o_RunningDisparity),
 	.o_KErr				(),
-	.i_Clk				(w_RxClk),
+	.i_Clk				(w_TxClk),
 	.i_ARst_L			(~i_XcverDigitalRst));	
 	
 	mDec8b10bMem u8b10bDec(
@@ -91,7 +92,7 @@ module mAltA5GXlvds (
 	.tx_out			(o_SerTx));
 	
 	mAltLvdsPll uAltTxPll(
-		.refclk		(w_RxClk),   	// refclk.clk
+		.refclk		(i_RefClk125M), // refclk.clk
 		.rst		(w_PorRst),     // reset.reset
 		.outclk_0	(w_TxSerClk),	// outclk0.clk
 		.outclk_1	(w_TxEnClk), 	// outclk1.clk
@@ -99,10 +100,12 @@ module mAltA5GXlvds (
 		.locked    	(w_TxLocked)	// locked.export
 	);
 	
+	reg [9:0] r10_txdata0;
 	always@(posedge w_TxClk)
-		r10_txdata <= w10_txdata;
+		r10_txdata <= w10_txdata;	
 	
-	assign o_CoreClk = w_RxClk;
+	assign o_RxClk = w_RxClk;
+	assign o_TxClk = w_TxClk;
 	
 	reg [7:0] r8_PorTmr;	
 	assign w_PorRst = ~(&r8_PorTmr);

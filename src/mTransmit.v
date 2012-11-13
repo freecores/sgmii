@@ -102,7 +102,7 @@ module mTransmit(
 		.i_Clk(i_Clk),
 		.i_ARst_L(i_ARst_L));	
 	//END FIFO
-	assign w_FifoRd = ((w_FifoTxEn && (r13_State==stXMIT_DATA||r13_State==stTX_IDLE)))?1'b0:1'b1;
+	assign w_FifoRd = ((w_FifoTxEn && (r13_State==stXMIT_DATA||r13_State==stIDLE_DATA)))?1'b0:1'b1;
 	
 	always@(posedge i_Clk or negedge i_ARst_L)
 	if(i_ARst_L==1'b0) begin

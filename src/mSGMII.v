@@ -63,6 +63,8 @@ module mSGMII
 	output	o_SGMIIDuplex,
 	
 	//GMII Interface
+	output 	o_TxClk,
+	output 	o_RxClk,
 	input	[07:00] i8_TxD,
 	input	i_TxEN,
 	input	i_TxER,
@@ -74,6 +76,7 @@ module mSGMII
 	output	o_Col,
 	output	o_Crs);
 	
+	wire 	w_ClkTx,w_ClkRx;	
 	wire 	w_ClkSys;
 	wire	w_Loopback;
 	reg		r_RestartAN;
@@ -140,6 +143,8 @@ module mSGMII
 	
 	assign o_Linkup = w_SyncStatus;
 	assign o_ANDone = w_ANComplete;
+	assign o_TxClk = w_ClkTx;
+	assign o_RxClk = w_ClkRx;
 	
 	mRateAdapter	u0RateAdapter(
 	//MAC Side signal
@@ -186,7 +191,7 @@ module mSGMII
 	assign w_CheckEndRRK		= w3_PreCheckIsRSet[2] & w3_PreCheckIsRSet[1] & w3_PreCheckIsComma[0];
 	assign w_CheckEndRRS		= w3_PreCheckIsRSet[2] & w3_PreCheckIsRSet[1] & w3_PreCheckIsSSet[0];
 	
-	always@(posedge w_ClkSys)
+	always@(posedge w_ClkRx)
 		begin
 			r8_RxCodeGroup[0] 	<= w8_RxCode;
 			r_RxCgCtrl[0] 		<= w_RxCodeCtrl;
@@ -242,7 +247,7 @@ module mSGMII
 	.i16_LpAdvAbility	(w16_LpAdvAbility));
 	
 	 mSyncCtrl u0SyncCtrl(
-	.i_Clk				(w_ClkSys		),
+	.i_Clk				(w_ClkRx		),
 	.i_Cke				((~w_GxBPowerDown)	),
 	.i_ARst_L			(w_ARstLogic_L	),
 	.i_CtrlLoopBack		(w_Loopback		),
@@ -269,7 +274,7 @@ module mSGMII
 	.o_IsSSet			(w_IsSSet	),
 	.o_IsRSet			(w_IsRSet	));
 	
-	always@(posedge w_ClkSys)
+	always@(posedge w_ClkRx)
 	begin
 	r_CheckEndKDK			<= w_CheckEndKDK;
 	r_CheckEndKD21_5D0_0	<= w_CheckEndKD21_5D0_0;
@@ -319,11 +324,11 @@ module mSGMII
 	.o8_RxD				(w8_RxD	),
 	.o_Invalid			(w_Invalid),
 	.o_Receiving		(w_Receiving),
-	.i_Clk				(w_ClkSys),
+	.i_Clk				(w_ClkRx),
 	.i_ARst_L			(w_ARstLogic_L));
 	
 	mANCtrl	u0ANCtrl(
-	.i_Clk				(w_ClkSys			),
+	.i_Clk				(w_ClkRx			),
 	.i_ARst_L			(w_ARstLogic_L		),
 	.i_Cke				((~w_GxBPowerDown)		),
 	.i_RestartAN		(w_ANRestart		),
@@ -356,7 +361,7 @@ module mSGMII
 	.o_TxCodeCtrl		(w_TxCodeCtrl		),
 	.i_CurrentParity	(w_CurrentParity	),
 	
-	.i_Clk				(w_ClkSys			),
+	.i_Clk				(w_ClkTx			),
 	.i_ARst_L			(w_ARstLogic_L		));
 	
 	assign w_SignalDetect=~w_RxCodeInvalid;
@@ -384,12 +389,14 @@ module mSGMII
 	.i_TxForceNegDisp	(w_TxForceNegDisp	),
 	.o_RunningDisparity	(w_CurrentParity));*/
 	
+	
 	mAltA5GXlvds u0Xcverlvds(
 	.i_SerRx			(i_SerRx			),
 	.o_SerTx			(o_SerTx			),
 		
 	.i_RefClk125M		(i_RefClk125M		),
-	.o_CoreClk			(w_ClkSys			),
+	.o_TxClk			(w_ClkTx			),
+	.o_RxClk			(w_ClkRx			),
 	.i_GxBPwrDwn		(w_GxBPowerDown		),
 	.i_XcverDigitalRst	(~i_ARstHardware_L	),	
 	.o_PllLocked		(w_PllLocked		),
@@ -406,6 +413,7 @@ module mSGMII
 	.i_TxForceNegDisp	(1'b0	),
 	.o_RunningDisparity	(w_CurrentParity));
 	
+	assign w_ClkSys	 = w_ClkTx;
 	assign o_GMIIClk = w_ClkSys;
 	
 	always@(posedge w_ClkSys or negedge i_ARstHardware_L )
